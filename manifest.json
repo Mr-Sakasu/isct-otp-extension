@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Science Tokyo OTP Autofill",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Fill and submit your own Science Tokyo OTP using an authenticator key or a Gmail OTP email.",
   "minimum_chrome_version": "105",
   "action": {"default_title": "Science Tokyo OTP settings"},

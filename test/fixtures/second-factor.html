@@ -1,0 +1,96 @@
+<!doctype html>
+<!-- Reconstructed from the supplied form structure. All tokens and data are synthetic. -->
+<html lang="en">
+<head><meta charset="utf-8"><title>Second-factor fixture</title></head>
+<body class="second_factors" data-test-case="fixture">
+  <form id="authenticator-selector">
+    <p>Please select an authentication method.</p>
+    <button class="select" data-target="fido2-form-wrapper" id="fido2-form-selector">Passwordless Authentication</button>
+    <button class="select" data-target="totp-form-wrapper" id="totp-form-selector">OTP (App) Authentication</button>
+    <button class="select" data-target="emailotp-form-wrapper" id="emailotp-form-selector">OTP (Email) Authentication</button>
+  </form>
+  <div id="fido2-form-wrapper" style="display: none">
+    <form id="fido2-form" action="/auth/session/fido2" method="post">
+      <input type="hidden" name="authenticity_token" value="TEST-CSRF-TOKEN">
+      <input type="hidden" name="credential_id" id="credential_id">
+      <button type="submit">Passwordless Authentication</button>
+    </form>
+  </div>
+  <div id="totp-form-wrapper" style="display: none">
+    <form id="totp-form" action="/auth/session/second_factor" data-remote="true" method="post">
+      <input name="utf8" type="hidden" value="✓">
+      <input type="hidden" name="authenticity_token" value="TEST-CSRF-TOKEN">
+      <div class="message warning" style="display: none">Login failed.</div>
+      <label for="totp">OTP</label>
+      <input type="text" name="totp" id="totp" placeholder="One-Time Password">
+      <button type="submit"><i></i>Next</button>
+    </form>
+  </div>
+  <div id="emailotp-form-wrapper" style="display: none">
+    <form id="send-otp-form" action="/auth/session/emailotp" method="post">
+      <input name="utf8" type="hidden" value="✓">
+      <input type="hidden" name="authenticity_token" value="TEST-CSRF-TOKEN">
+      <div class="message warning" style="display: none">Login failed.</div>
+      <div class="message error" style="display: none">Failed to send the email.</div>
+      <div class="message normal" style="display: none">One-Time Password has been sent to your registered email address.</div>
+      <button type="submit"><i></i>&nbsp;Send One-Time Password<input type="hidden" name="sendotp" id="sendotp" value="true"></button>
+    </form>
+    <form id="emailotp-form" action="/auth/session/second_factor" data-remote="true" method="post">
+      <input name="utf8" type="hidden" value="✓">
+      <input type="hidden" name="authenticity_token" value="TEST-CSRF-TOKEN">
+      <label for="emailotp">OTP</label>
+      <input type="text" name="emailotp" id="emailotp" placeholder="One-Time Password">
+      <button type="submit"><i></i>Next</button>
+    </form>
+  </div>
+  <form id="cancel-form" action="/auth/session" method="post">
+    <input type="hidden" name="_method" value="delete">
+    <input type="hidden" name="authenticity_token" value="TEST-CSRF-TOKEN">
+    <button type="submit">Cancel</button>
+  </form>
+  <script>
+    window.fixtureResult = { selectionCount: 0, sendCount: 0, submitCount: 0, otherSubmits: 0 };
+    const selectorForm = document.querySelector("#authenticator-selector");
+    selectorForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      fixtureResult.otherSubmits++;
+    });
+    for (const selector of selectorForm.querySelectorAll("button.select")) {
+      selector.addEventListener("click", (event) => {
+        event.preventDefault();
+        fixtureResult.selectionCount++;
+        fixtureResult.selected = selector.id;
+        selectorForm.style.display = "none";
+        document.getElementById(selector.dataset.target).style.display = "block";
+      });
+    }
+    const sendForm = document.querySelector("#send-otp-form");
+    sendForm.querySelector("button").addEventListener("click", (event) => {
+      event.preventDefault();
+      fixtureResult.sendCount++;
+      document.body.dataset.sent = "yes";
+      event.currentTarget.disabled = true;
+      setTimeout(() => {
+        sendForm.querySelector(".normal").style.display = "block";
+        sendForm.querySelector("button").disabled = false;
+      }, 50);
+    });
+    for (const form of document.querySelectorAll("#totp-form, #emailotp-form")) {
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        fixtureResult.submitCount++;
+        fixtureResult.formId = form.id;
+        fixtureResult.fields = Object.fromEntries(new FormData(form));
+        fixtureResult.action = new URL(form.action).pathname;
+        document.body.dataset.submitted = form.querySelector("input[type='text']").value;
+      });
+    }
+    for (const form of document.querySelectorAll("#fido2-form, #cancel-form")) {
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        fixtureResult.otherSubmits++;
+      });
+    }
+  </script>
+</body>
+</html>

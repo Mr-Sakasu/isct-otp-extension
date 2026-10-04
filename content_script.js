@@ -2,68 +2,86 @@
   "use strict";
   if (location.origin !== "https://isct.ex-tic.com" || !/^\/auth\/session\/second_factor(?:\/|$)/.test(location.pathname)) return;
 
-  const SEND_LABEL = /(?:ワンタイムパスワードを送信|send one[- ]time password)/i;
-  const NEXT_LABEL = /(?:次へ|next|続行|continue)/i;
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-  const labelOf = (element) => (element.tagName === "INPUT" ? element.value : element.textContent).trim();
-  const visible = (element) => !!(element.getClientRects().length && !element.disabled);
+  const visible = (element) => !!element && element.getClientRects().length > 0 && getComputedStyle(element).visibility !== "hidden";
+  const methods = {
+    totp: { selector: "totp-form-selector", form: "totp-form", field: "totp" },
+    gmail: { selector: "emailotp-form-selector", form: "emailotp-form", field: "emailotp" }
+  };
 
-  function findButton(pattern) {
-    return [...document.querySelectorAll("button, input[type='submit'], input[type='button']")]
-      .find((element) => visible(element) && pattern.test(labelOf(element)));
+  function getOtpForm(mode) {
+    const method = methods[mode];
+    const form = document.getElementById(method.form);
+    const input = form?.querySelector(`input#${method.field}[name='${method.field}']`);
+    if (!visible(input)) return null;
+    const action = new URL(form.action, location.href);
+    if (action.origin !== location.origin || action.pathname !== "/auth/session/second_factor" || form.method.toLowerCase() !== "post") return null;
+    return { form, input };
   }
 
-  function findOtpField() {
-    const candidates = [...document.querySelectorAll("input")]
-      .filter((input) => visible(input) && ["text", "password", "tel", "number"].includes(input.type));
-    if (!candidates.length) return null;
-    const named = candidates.find((input) =>
-      input.autocomplete === "one-time-code" ||
-      /(?:one[-_ ]time|otp|ワンタイム|verification[-_ ]?code)/i.test(
-        [input.name, input.id, input.placeholder, input.getAttribute("aria-label")].join(" ")
-      )
-    );
-    return named || (candidates.length === 1 ? candidates[0] : null);
+  function clickWithoutDefaultSubmit(button) {
+    // The site's click handler selects a wrapper or sends email through AJAX.
+    button.addEventListener("click", (event) => event.preventDefault(), { once: true });
+    button.click();
   }
 
-  function fillAndSubmit(code) {
-    const input = findOtpField();
-    if (!input || input.value.trim()) return false;
+  async function waitForOtpForm(mode) {
+    return new Promise((resolve) => {
+      let selectionAttempts = 0;
+      let selectionTimer;
+      const finish = (result) => {
+        observer.disconnect();
+        clearTimeout(timeout);
+        clearTimeout(selectionTimer);
+        resolve(result);
+      };
+      const inspect = () => {
+        const context = getOtpForm(mode);
+        if (context) return finish(context);
+        const otherMode = mode === "totp" ? "gmail" : "totp";
+        if (getOtpForm(otherMode) || visible(document.getElementById("fido2-form-wrapper"))) {
+          console.warn("ISCT OTP: The selected site method does not match the extension settings.");
+          return finish(null);
+        }
+        const selector = document.getElementById(methods[mode].selector);
+        if (selectionAttempts < 3 && visible(selector) && !selector.disabled && !selectionTimer) {
+          selectionAttempts++;
+          clickWithoutDefaultSubmit(selector);
+          const selected = getOtpForm(mode);
+          if (selected) return finish(selected);
+          // Allow the site's document-ready handlers to finish binding.
+          selectionTimer = setTimeout(() => { selectionTimer = null; inspect(); }, 250);
+        }
+      };
+      const observer = new MutationObserver(inspect);
+      observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true });
+      const timeout = setTimeout(() => finish(null), 300000);
+      inspect();
+    });
+  }
+
+  function hasFailure(mode, context) {
+    const warning = context.form.querySelector(".message.warning");
+    if (visible(warning)) return true;
+    return mode === "gmail" && [...document.querySelectorAll("#send-otp-form .warning, #send-otp-form .error")].some(visible);
+  }
+
+  function fillAndSubmit(mode, code) {
+    const context = getOtpForm(mode);
+    if (!context || hasFailure(mode, context)) return false;
+    const { form, input } = context;
+    if (input.disabled || input.readOnly || input.value.trim()) return false;
+    const next = form.querySelector("button[type='submit']");
+    if (!visible(next) || next.disabled) return false;
+    if (!(mode === "totp" ? /^[0-9]{6}$/ : /^[0-9]{4,8}$/).test(code)) return false;
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
     setter.call(input, code);
     input.dispatchEvent(new Event("input", { bubbles: true }));
     input.dispatchEvent(new Event("change", { bubbles: true }));
-    const form = input.form;
-    const next = findButton(NEXT_LABEL) || (form && [...form.querySelectorAll("button[type='submit'], input[type='submit']")]
-      .find((button) => visible(button) && !SEND_LABEL.test(labelOf(button))));
-    if (next) {
-      next.click();
-      return true;
-    }
-    if (form && !findButton(SEND_LABEL)) {
-      form.requestSubmit();
-      return true;
-    }
-    console.warn("ISCT OTP: Code filled, but the Next button was not found.");
+    // A normal click preserves the site's Rails UJS submit handlers and CSRF field.
+    next.click();
     return true;
   }
-
-  const field = findOtpField() || await new Promise((resolve) => {
-    const observer = new MutationObserver(() => {
-      const current = findOtpField();
-      if (current) {
-        observer.disconnect();
-        clearTimeout(timeout);
-        resolve(current);
-      }
-    });
-    observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true });
-    const timeout = setTimeout(() => {
-      observer.disconnect();
-      resolve(null);
-    }, 300000);
-  });
-  if (!field) return;
 
   let status;
   try {
@@ -72,34 +90,36 @@
     console.warn("ISCT OTP: Extension is unavailable.", error);
     return;
   }
-  if (!status?.ready) return;
+  if (!status?.ready || !methods[status.mode]) return;
+  const context = await waitForOtpForm(status.mode);
+  if (!context || context.input.value.trim() || hasFailure(status.mode, context)) return;
 
-  const sendButton = findButton(SEND_LABEL);
-  if (status.mode === "gmail" && !sendButton) {
-    console.warn("ISCT OTP: Select email authentication on the site.");
-    return;
-  }
-  if (status.mode === "totp" && sendButton) {
-    console.warn("ISCT OTP: Select app authentication on the site.");
-    return;
-  }
-
-  let since = Date.now();
+  const since = Date.now();
+  let sendForm;
   if (status.mode === "gmail") {
-    const previousSend = Number(sessionStorage.getItem("isctOtpEmailSentAt"));
-    if (Number.isFinite(previousSend) && Date.now() - previousSend < 120000) {
-      since = previousSend;
-    } else {
-      sessionStorage.setItem("isctOtpEmailSentAt", String(since));
-      sendButton.click();
+    sendForm = document.getElementById("send-otp-form");
+    const sendButton = sendForm?.querySelector("button[type='submit']");
+    if (!visible(sendButton)) return;
+    const sendAction = new URL(sendForm.action, location.href);
+    if (sendAction.origin !== location.origin || sendAction.pathname !== "/auth/session/emailotp" || sendForm.method.toLowerCase() !== "post") return;
+    if (!sendButton.disabled && !visible(sendForm.querySelector(".message.normal"))) {
+      clickWithoutDefaultSubmit(sendButton);
     }
   }
 
   const interval = status.mode === "gmail" ? 3000 : 1000;
   const deadline = Date.now() + 120000;
   while (Date.now() < deadline) {
-    const currentField = findOtpField();
-    if (!currentField || currentField.value.trim()) return;
+    const current = getOtpForm(status.mode);
+    if (!current || current.input.disabled || current.input.readOnly || current.input.value.trim()) return;
+    if (hasFailure(status.mode, current)) {
+      console.warn("ISCT OTP: The site reported a verification or email error. Automatic attempts stopped.");
+      return;
+    }
+    if (sendForm && !visible(sendForm.querySelector(".message.normal"))) {
+      await sleep(500);
+      continue;
+    }
     try {
       const response = await chrome.runtime.sendMessage({ type: "GET_CODE", since });
       if (response?.error) {
@@ -107,7 +127,7 @@
         return;
       }
       if (response?.code) {
-        fillAndSubmit(response.code);
+        fillAndSubmit(status.mode, response.code);
         return;
       }
     } catch (error) {

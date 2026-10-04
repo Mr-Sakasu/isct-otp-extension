@@ -19,7 +19,7 @@
 </head>
 <body>
   <h1>Science Tokyo OTP settings</h1>
-  <p>Choose the method you select on the Science Tokyo sign-in page. This extension fills and submits the OTP on <code>isct.ex-tic.com</code>.</p>
+  <p>Choose your OTP method. This extension selects that method on the Science Tokyo sign-in page, fills the code, and submits it on <code>isct.ex-tic.com</code>.</p>
 
   <label for="mode">OTP method</label>
   <select id="mode">
@@ -29,7 +29,7 @@
 
   <section>
     <h2>Authenticator app</h2>
-    <p>During app authentication setup, copy the Base32 setup key or the <code>otpauth://totp</code> link. The extension needs the same key as your authenticator app.</p>
+    <p>The setup key is the secret encoded in the QR code used to register your authenticator. Enter the Base32 key or an <code>otpauth://totp</code> link. This is different from the changing six-digit code and your Google password. The extension generates codes from this key; it cannot read your phone's authenticator app.</p>
     <label for="secret">Setup key or otpauth link</label>
     <input id="secret" type="password" autocomplete="off" spellcheck="false" placeholder="Leave blank to keep the saved key">
     <small id="secretState"></small>
