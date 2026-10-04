@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,6 +13,7 @@ const require = createRequire(import.meta.url);
 const { generateTotp, parseTotpSecret } = require("../core.js");
 const extensionDirectory = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const fixtureHtml = await readFile(new URL("./fixtures/second-factor.html", import.meta.url), "utf8");
+const loginHtml = await readFile(new URL("./fixtures/login.html", import.meta.url), "utf8");
 const profile = await mkdtemp(path.join(os.tmpdir(), "isct-otp-browser-"));
 const port = 20000 + Math.floor(Math.random() * 20000);
 function startChrome() { return spawn(process.env.CHROME_BIN || "chromium", [
@@ -138,9 +139,9 @@ async function waitForSubmission() {
   throw new Error("The extension did not submit an OTP within ten seconds.");
 }
 
-async function navigateWithMock(html, marker) {
+async function navigateWithMock(html, marker, url = "https://isct.ex-tic.com/auth/session/second_factor") {
   page.mockHtml = html;
-  await page.send("Page.navigate", { url: "https://isct.ex-tic.com/auth/session/second_factor" });
+  await page.send("Page.navigate", { url });
   for (let attempt = 0; attempt < 50; attempt++) {
     const loaded = await evaluate(page, "document.body?.dataset.testCase || ''");
     if (loaded === marker) return;
@@ -156,15 +157,19 @@ try {
   page.on("Runtime.executionContextsCleared", () => { contexts = []; });
   await page.send("Runtime.enable");
   page.on("Fetch.requestPaused", (event) => {
+    const responseHtml = page.flowHtml && new URL(event.request.url).pathname === "/auth/session/second_factor" ? page.flowHtml : page.mockHtml;
     page.send("Fetch.fulfillRequest", {
       requestId: event.requestId,
       responseCode: 200,
       responseHeaders: [{ name: "Content-Type", value: "text/html; charset=utf-8" }],
-      body: Buffer.from(page.mockHtml).toString("base64")
+      body: Buffer.from(responseHtml).toString("base64")
     }).catch((error) => { throw error; });
   });
   await page.send("Fetch.enable", {
-    patterns: [{ urlPattern: "https://isct.ex-tic.com/auth/session/second_factor*", requestStage: "Request" }]
+    patterns: [
+      { urlPattern: "https://isct.ex-tic.com/auth/session/second_factor*", requestStage: "Request" },
+      { urlPattern: "https://isct.ex-tic.com/auth/session", requestStage: "Request" }
+    ]
   });
 
   await evaluate(worker, 'chrome.storage.local.set({mode:"totp"})');
@@ -292,6 +297,77 @@ try {
   assert.equal(otherMethod.sendCount, 0);
   assert.equal(otherMethod.submitCount, 0);
   console.log("Another method already selected: no override or submission.");
+
+  const username = "test-science-tokyo-id";
+  const universityPassword = "test-only university password";
+  await navigateOptions();
+  await evaluate(page, `document.getElementById("username").value=${JSON.stringify(username)};document.getElementById("universityPassword").value=${JSON.stringify(universityPassword)};document.getElementById("newPassphrase").value=${JSON.stringify(passphrase)};document.getElementById("confirmPassphrase").value=${JSON.stringify(passphrase)};document.getElementById("save").click()`);
+  await waitForUi('document.getElementById("status").textContent.startsWith("Settings saved.") && !document.getElementById("save").disabled', "login credentials saved");
+  const encryptedLogin = JSON.stringify(await evaluate(worker, "chrome.storage.local.get(null)"));
+  for (const value of [username, universityPassword, secret, passphrase]) assert.ok(!encryptedLogin.includes(value));
+  assert.equal(await evaluate(page, 'document.getElementById("universityPassword").value'), "");
+  // Keep the persisted snapshot current for the browser restart assertion.
+  localRecord.vault = (await evaluate(worker, 'chrome.storage.local.get("vault")')).vault;
+  await navigateWithMock(loginHtml, "login", "https://isct.ex-tic.com/auth/session");
+  await waitForUi('window.loginResult?.passwordSubmits === 1', "username to password transition");
+  const login = await evaluate(page, "loginResult");
+  assert.equal(login.username, username);
+  assert.equal(login.password, universityPassword);
+  assert.equal(login.firstPassword, "");
+  assert.equal(login.csrf, "TEST-LOGIN-CSRF-TOKEN");
+  assert.equal(login.usernameSubmits, 1);
+  assert.equal(login.passwordSubmits, 1);
+  await delay(300);
+  assert.equal((await evaluate(page, "loginResult")).passwordSubmits, 1);
+  const loginContext = contexts.findLast((context) => context.origin.startsWith("chrome-extension://") && !context.auxData?.isDefault);
+  assert.ok(loginContext);
+  assert.ok((await evaluate(page, 'chrome.runtime.sendMessage({type:"GET_CODE"})', loginContext.id)).error);
+  assert.ok((await evaluate(page, 'chrome.runtime.sendMessage({type:"REVEAL_KEY"})', loginContext.id)).error);
+  console.log("Login: username submitted first, password filled after AJAX transition, CSRF preserved, both steps submitted once.");
+
+  const rememberedLogin = loginHtml.replace('data-test-case="login"', 'data-test-case="login-remembered"').replace('name="identifier" type="text"', `name="identifier" type="text" value="${username}"`);
+  await navigateWithMock(rememberedLogin, "login-remembered", "https://isct.ex-tic.com/auth/session");
+  await waitForUi('window.loginResult?.passwordSubmits === 1', "continue with remembered matching username");
+  assert.equal((await evaluate(page, "loginResult")).username, username);
+  console.log("Remembered username: matching saved identity continues without overwriting the field.");
+
+  for (const [label, html] of [
+    ["login-manual", loginHtml.replace('name="identifier" type="text"', 'name="identifier" type="text" value="manual-id"')],
+    ["login-warning", loginHtml.replace('class="message warning" style="display:none"', 'class="message warning" style="display:block"')],
+    ["login-account-mismatch", loginHtml.replace('data-next="false"', 'data-next="false" data-stage="password"').replace('name="identifier" type="text"', 'name="identifier" type="text" value="different-account"')],
+    ["login-external-action", loginHtml.replace('id="login" action="/auth/session"', 'id="login" action="https://example.invalid/auth/session"')]
+  ]) {
+    await navigateWithMock(html.replace('data-test-case="login"', `data-test-case="${label}"`), label, "https://isct.ex-tic.com/auth/session");
+    await delay(300);
+    const result = await evaluate(page, "loginResult");
+    assert.equal(result.usernameSubmits, 0, label);
+    assert.equal(result.passwordSubmits, 0, label);
+    assert.equal(await evaluate(page, 'document.querySelector("form#login #password").value'), "", label);
+  }
+  assert.ok((await evaluate(worker, 'handleMessage({type:"GET_LOGIN_VALUE",field:"password"},{id:chrome.runtime.id,url:"https://isct.ex-tic.com/auth/session/second_factor",tab:{id:1}})')).error);
+  assert.ok((await evaluate(worker, 'handleMessage({type:"GET_LOGIN_VALUE",field:"password"},{id:chrome.runtime.id,url:"https://example.invalid/auth/session",tab:{id:1}})')).error);
+  console.log("Login safeguards: manual input, errors, different accounts, other form origins, and credential requests from other pages do not proceed.");
+
+  await navigateOptions();
+  await optionsCall({ type: "LOCK_VAULT" });
+  await navigateWithMock(loginHtml.replace('data-test-case="login"', 'data-test-case="login-locked"'), "login-locked", "https://isct.ex-tic.com/auth/session");
+  await delay(300);
+  assert.equal((await evaluate(page, "loginResult")).usernameSubmits, 0);
+  await navigateOptions();
+  assert.equal((await optionsCall({ type: "UNLOCK_VAULT", passphrase })).unlocked, true);
+  page.flowHtml = fixtureHtml.replace('data-test-case="fixture"', 'data-test-case="login-flow-otp"');
+  // The public site can choose FIDO2 by default after the username AJAX call.
+  page.mockHtml = loginHtml.replace('data-next="false"', 'data-next="true" data-fido="true"');
+  await page.send("Page.navigate", { url: "https://isct.ex-tic.com/auth/session" });
+  await waitForUi('document.body?.dataset.testCase === "login-flow-otp"', "full login reaches OTP");
+  await waitForSubmission();
+  const fullLogin = await evaluate(page, 'JSON.parse(sessionStorage.getItem("TEST-login-result"))');
+  assert.equal(fullLogin.usernameSubmits, 1);
+  assert.equal(fullLogin.passwordSubmits, 1);
+  assert.equal(fullLogin.methodSelections, 1);
+  assert.equal((await evaluate(page, "fixtureResult")).submitCount, 1);
+  page.flowHtml = null;
+  console.log("Full flow: unlock → username → password → OTP, including the site's default FIDO2 tab selection.");
   assert.equal(await evaluate(worker, "networkCalls"), 0);
   console.log("TOTP privacy: no fetch requests; content script cannot access encrypted local storage or unlocked session storage.");
 
@@ -351,11 +427,39 @@ try {
   await evaluate(page, `document.getElementById("confirmPassphrase").value=${JSON.stringify(passphrase)};document.getElementById("save").click()`);
   await waitForUi('document.getElementById("status").textContent.startsWith("Settings saved.") && !document.getElementById("save").disabled', "new setup key saved");
   assert.equal(await evaluate(page, 'document.getElementById("secret").value'), "");
-  const changedPassphrase = "changed test-only passphrase with several words";
+  const changedPassphrase = "aBc456";
   await evaluate(page, `document.getElementById("newPassphrase").value=${JSON.stringify(changedPassphrase)};document.getElementById("confirmPassphrase").value=${JSON.stringify(changedPassphrase)};document.getElementById("save").click()`);
   await waitForUi('document.getElementById("newPassphrase").value === "" && document.getElementById("status").textContent.startsWith("Settings saved.") && !document.getElementById("save").disabled', "passphrase changed");
   assert.ok((await optionsCall({ type: "UNLOCK_VAULT", passphrase })).error);
   assert.equal((await optionsCall({ type: "REVEAL_KEY", passphrase: changedPassphrase })).secret, secret);
+  for (const [language, filename] of [["en", "options.html"], ["ja", "options.ja.html"], ["zh-CN", "options.zh-CN.html"]]) {
+    const url = await evaluate(worker, `chrome.runtime.getURL(${JSON.stringify(filename)})`);
+    await page.send("Page.navigate", { url });
+    await waitForUi('!!document.getElementById("secretState")?.textContent', `options language ${language}`);
+    assert.equal(await evaluate(page, "document.documentElement.lang"), language);
+    assert.equal((await optionsCall({ type: "VAULT_STATUS" })).unlocked, true);
+    assert.deepEqual(await evaluate(page, '[...document.querySelectorAll("nav a")].map(a=>a.getAttribute("href"))'), ["options.html", "options.ja.html", "options.zh-CN.html"]);
+    await evaluate(page, 'document.getElementById("showCode").click()');
+    await waitForUi('/^[0-9]{6}$/.test(document.getElementById("currentCode").textContent)', `localized code ${language}`);
+    if (language === "ja") assert.match(await evaluate(page, 'document.getElementById("codeExpiry").textContent'), /秒後/);
+    if (language === "zh-CN") assert.match(await evaluate(page, 'document.getElementById("codeExpiry").textContent'), /秒后/);
+    await evaluate(page, 'document.getElementById("showCode").click()');
+  }
+  for (const [language, filename] of [["en", "help.html"], ["ja", "help.ja.html"], ["zh-CN", "help.zh-CN.html"]]) {
+    const url = await evaluate(worker, `chrome.runtime.getURL(${JSON.stringify(filename)})`);
+    await page.send("Page.navigate", { url });
+    await waitForUi('document.images.length === 3 && [...document.images].every(img=>img.complete && img.naturalWidth>0)', `guide images ${language}`);
+    assert.equal(await evaluate(page, "document.documentElement.lang"), language);
+    assert.deepEqual(await evaluate(page, '[...document.querySelectorAll("nav a")].map(a=>a.getAttribute("href"))'), ["help.html", "help.ja.html", "help.zh-CN.html"]);
+    assert.match(await evaluate(page, "document.body.textContent"), /App Authentication/);
+    assert.match(await evaluate(page, "document.body.textContent"), /Remove/);
+    if (language === "ja") {
+      const { data } = await page.send("Page.captureScreenshot", { captureBeyondViewport: true });
+      await writeFile(path.join(profile, "guide-ja.png"), Buffer.from(data, "base64"));
+    }
+  }
+  console.log("Languages: all three settings pages are authorized and localized; guide pages load original illustrations and relative links.");
+  await navigateOptions();
   assert.equal((await optionsCall({ type: "DELETE_KEY" })).removed, true);
   console.log("New enrollment and passphrase change: confirmation checked, plaintext input cleared, setup key preserved, old passphrase rejected.");
 } finally {

@@ -1,0 +1,75 @@
+<!doctype html>
+<!-- Public login form structure with synthetic data; never real credentials or tokens. -->
+<html lang="en">
+<head><meta charset="utf-8"><title>Login fixture</title>
+  <style>.move-off-screen { position: absolute; left: -10000px; }</style>
+</head>
+<body data-test-case="login" data-next="false">
+  <a id="password-form-selector" href="#password">Password</a>
+  <a id="fido2-form-selector" href="#fido2">Passwordless</a>
+  <form id="login" action="/auth/session" method="post" data-remote="true" data-pre-action="/auth/session/authenticators">
+    <input type="hidden" name="utf8" value="✓">
+    <input type="hidden" name="authenticity_token" value="TEST-LOGIN-CSRF-TOKEN">
+    <div class="message warning" style="display:none">Login failed.</div>
+    <div id="identifier-field-wrapper">
+      <input id="identifier" name="identifier" type="text" autocomplete="username" placeholder="User Name">
+    </div>
+    <div id="password-field-wrapper" class="move-off-screen">
+      <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Password">
+    </div>
+    <button type="submit">Next</button>
+  </form>
+  <div id="fido2-form-wrapper" style="display:none">
+    <form id="fido2-form" action="/auth/session/fido2" method="post">
+      <input id="identifier" name="identifier" type="hidden" value="">
+      <button type="submit">Passwordless</button>
+    </form>
+  </div>
+  <script>
+    const form = document.getElementById("login");
+    const identifier = form.querySelector("#identifier");
+    const password = form.querySelector("#password");
+    const button = form.querySelector("button");
+    let step = "first";
+    window.loginResult = { usernameSubmits: 0, passwordSubmits: 0, methodSelections: 0 };
+    document.getElementById("password-form-selector").addEventListener("click", (event) => {
+      event.preventDefault();
+      loginResult.methodSelections++;
+      form.style.display = "block";
+      document.getElementById("fido2-form-wrapper").style.display = "none";
+    });
+    document.getElementById("fido2-form-selector").addEventListener("click", (event) => {
+      event.preventDefault();
+      form.style.display = "none";
+      document.getElementById("fido2-form-wrapper").style.display = "block";
+    });
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (step === "first") {
+        loginResult.usernameSubmits++;
+        loginResult.username = identifier.value;
+        loginResult.firstPassword = password.value;
+        button.disabled = true;
+        setTimeout(() => {
+          step = "second";
+          document.getElementById("identifier-field-wrapper").style.display = "none";
+          document.getElementById("password-field-wrapper").classList.remove("move-off-screen");
+          button.disabled = false;
+          if (document.body.dataset.fido === "true") document.getElementById("fido2-form-selector").click();
+        }, 50);
+      } else {
+        loginResult.passwordSubmits++;
+        loginResult.password = password.value;
+        loginResult.csrf = new FormData(form).get("authenticity_token");
+        sessionStorage.setItem("TEST-login-result", JSON.stringify(loginResult));
+        if (document.body.dataset.next === "true") location.href = "/auth/session/second_factor";
+      }
+    });
+    if (document.body.dataset.stage === "password") {
+      step = "second";
+      document.getElementById("identifier-field-wrapper").style.display = "none";
+      document.getElementById("password-field-wrapper").classList.remove("move-off-screen");
+    }
+  </script>
+</body>
+</html>

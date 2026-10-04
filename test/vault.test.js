@@ -28,9 +28,18 @@ test("wrong passphrase and modified ciphertext, nonce, or salt cannot decrypt", 
 });
 
 test("invalid records and short passphrases are rejected", async () => {
-  await assert.rejects(encryptVault(config, "short"), /at least 12/);
+  await assert.rejects(encryptVault(config, "short"), /at least 6/);
   const vault = await encryptVault(config, passphrase);
   await assert.rejects(decryptVault({ ...vault, iterations: 1 }, passphrase), /Invalid encrypted/);
   await assert.rejects(decryptVault({ ...vault, salt: [999] }, passphrase), /Invalid encrypted/);
   await assert.rejects(decryptVault({ ...vault, iv: vault.iv.slice(1) }, passphrase), /Invalid encrypted/);
+});
+
+test("six-character passphrase encrypts username, university password, and OTP key together", async () => {
+  const data = { ...config, username: "test-science-tokyo-id", password: "test-only university password " };
+  const vault = await encryptVault(data, "abc123");
+  assert.deepEqual(await decryptVault(vault, "abc123"), data);
+  const stored = JSON.stringify(vault);
+  for (const value of [data.username, data.password, data.secret, "abc123"]) assert.ok(!stored.includes(value));
+  await assert.rejects(encryptVault({ ...config, password: "password without username" }, "abc123"), /username and password/);
 });
