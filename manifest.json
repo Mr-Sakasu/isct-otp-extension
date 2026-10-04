@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Science Tokyo OTP Autofill",
+  "version": "0.1.0",
+  "description": "Fill and submit your own Science Tokyo OTP using an authenticator key or a Gmail OTP email.",
+  "minimum_chrome_version": "105",
+  "action": {"default_title": "Science Tokyo OTP settings"},
+  "permissions": ["storage", "identity"],
+  "host_permissions": ["https://gmail.googleapis.com/*"],
+  "oauth2": {
+    "client_id": "REPLACE_WITH_YOUR_CHROME_EXTENSION_CLIENT_ID.apps.googleusercontent.com",
+    "scopes": ["https://www.googleapis.com/auth/gmail.readonly"]
+  },
+  "background": {"service_worker": "service_worker.js"},
+  "content_scripts": [{
+    "matches": ["https://isct.ex-tic.com/auth/session/second_factor*"],
+    "js": ["content_script.js"],
+    "run_at": "document_idle"
+  }],
+  "options_ui": {"page": "options.html", "open_in_tab": true}
+}

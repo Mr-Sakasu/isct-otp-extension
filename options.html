@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Science Tokyo OTP settings</title>
+  <style>
+    body { font: 16px/1.5 system-ui, sans-serif; max-width: 720px; margin: 3rem auto; padding: 0 1rem; color: #183044; }
+    h1 { font-size: 1.6rem; }
+    label { display: block; margin: 1.2rem 0 .4rem; font-weight: 650; }
+    input, select, button { font: inherit; }
+    input, select { box-sizing: border-box; width: 100%; padding: .65rem; border: 1px solid #8093a1; border-radius: 5px; }
+    button { margin: .8rem .4rem .3rem 0; padding: .6rem .9rem; border: 0; border-radius: 5px; background: #0870a8; color: white; cursor: pointer; }
+    button.secondary { background: #536575; }
+    section { border-top: 1px solid #d7e0e6; margin-top: 1.5rem; padding-top: .5rem; }
+    small { display: block; color: #485e6d; }
+    #status { min-height: 1.5rem; font-weight: 650; }
+  </style>
+</head>
+<body>
+  <h1>Science Tokyo OTP settings</h1>
+  <p>Choose the method you select on the Science Tokyo sign-in page. This extension fills and submits the OTP on <code>isct.ex-tic.com</code>.</p>
+
+  <label for="mode">OTP method</label>
+  <select id="mode">
+    <option value="totp">Authenticator app</option>
+    <option value="gmail">OTP email in Gmail</option>
+  </select>
+
+  <section>
+    <h2>Authenticator app</h2>
+    <p>During app authentication setup, copy the Base32 setup key or the <code>otpauth://totp</code> link. The extension needs the same key as your authenticator app.</p>
+    <label for="secret">Setup key or otpauth link</label>
+    <input id="secret" type="password" autocomplete="off" spellcheck="false" placeholder="Leave blank to keep the saved key">
+    <small id="secretState"></small>
+    <button id="removeSecret" class="secondary" type="button">Remove saved key</button>
+  </section>
+
+  <section>
+    <h2>Gmail OTP email</h2>
+    <p>Gmail access uses the read-only Gmail scope. Authorize the Gmail account that receives messages from <code>noreply@ex-tic.com</code>.</p>
+    <button id="connectGmail" type="button">Connect Gmail</button>
+    <small id="gmailState"></small>
+  </section>
+
+  <section>
+    <button id="save" type="button">Save settings</button>
+    <p id="status" role="status" aria-live="polite"></p>
+  </section>
+  <script src="core.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>
