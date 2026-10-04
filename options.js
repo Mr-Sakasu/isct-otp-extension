@@ -10,7 +10,7 @@ let codeDisplayVersion = 0;
 let keyDisplayVersion = 0;
 
 function status(message) {
-  statusText.textContent = message;
+  statusText.textContent = ISCTLocale.text(message);
 }
 
 async function request(message) {
@@ -25,7 +25,7 @@ function hideCode() {
   codeTimer = null;
   document.getElementById("currentCode").textContent = "";
   document.getElementById("codeExpiry").textContent = "";
-  showCodeButton.textContent = "Show current code";
+  showCodeButton.textContent = ISCTLocale.text("Show current code");
 }
 
 function hideKey() {
@@ -50,11 +50,17 @@ async function refresh() {
   } else if (!settings.encrypted) state.textContent = "No setup key saved.";
   else if (!settings.unlocked) state.textContent = "Encrypted setup key saved. Locked.";
   else state.textContent = `Encrypted key unlocked until ${new Date(settings.expiresAt).toLocaleTimeString()}.`;
+  state.textContent = ISCTLocale.text(state.textContent);
   document.getElementById("unlock").disabled = !settings.encrypted;
   document.getElementById("lock").disabled = !settings.unlocked;
   document.getElementById("showKey").disabled = !settings.encrypted;
   showCodeButton.disabled = !settings.unlocked;
   document.getElementById("gmailState").textContent = settings.gmailConnected ? "Gmail was connected on this browser." : "Gmail is not connected yet.";
+  document.getElementById("gmailState").textContent = ISCTLocale.text(document.getElementById("gmailState").textContent);
+  document.getElementById("loginState").textContent = !settings.unlocked ? "Unlock saved data to check the login settings." :
+    settings.passwordSaved ? "Username and university password saved for automatic login." :
+    settings.usernameSaved ? "Username saved. University password is not saved yet." : "No university login credentials saved.";
+  document.getElementById("loginState").textContent = ISCTLocale.text(document.getElementById("loginState").textContent);
   if (!settings.unlocked) hideCode();
 }
 
@@ -82,11 +88,14 @@ document.getElementById("save").addEventListener("click", () => act(async () => 
   const passphrase = document.getElementById("newPassphrase").value;
   const confirmation = document.getElementById("confirmPassphrase").value;
   if (passphrase !== confirmation) throw new Error("The new passphrases do not match.");
-  const message = { type: "SAVE_SETTINGS", mode: modeInput.value, secret: secretInput.value.trim(), passphrase };
+  const message = { type: "SAVE_SETTINGS", mode: modeInput.value, secret: secretInput.value.trim(), passphrase,
+    username: document.getElementById("username").value.trim(), password: document.getElementById("universityPassword").value };
   clearPassphrases();
   status("Saving settings…");
   await request(message);
   secretInput.value = "";
+  document.getElementById("username").value = "";
+  document.getElementById("universityPassword").value = "";
   status("Settings saved. The setup key is encrypted when present.");
 }));
 
@@ -95,7 +104,7 @@ document.getElementById("unlock").addEventListener("click", () => act(async () =
   clearPassphrases();
   status("Unlocking…");
   await request({ type: "UNLOCK_VAULT", passphrase });
-  status("Unlocked for 30 minutes. Reload the university's second-factor page to use automatic entry.");
+  status("Unlocked for 30 minutes. Open or reload the university's login page to start automatic entry.");
 }));
 
 document.getElementById("lock").addEventListener("click", () => act(async () => {
@@ -103,6 +112,8 @@ document.getElementById("lock").addEventListener("click", () => act(async () => 
   hideKey();
   clearPassphrases();
   secretInput.value = "";
+  document.getElementById("username").value = "";
+  document.getElementById("universityPassword").value = "";
   await request({ type: "LOCK_VAULT" });
   status("Locked. Unlocked session key removed.");
 }));
@@ -128,13 +139,13 @@ async function updateCode(version) {
   const result = await request({ type: "GET_LOCAL_CODE" });
   if (version !== codeDisplayVersion || document.hidden) return;
   document.getElementById("currentCode").textContent = result.code;
-  document.getElementById("codeExpiry").textContent = `Refreshes in ${result.remainingSeconds} seconds.`;
+  document.getElementById("codeExpiry").textContent = ISCTLocale.text(`Refreshes in ${result.remainingSeconds} seconds.`);
 }
 
 showCodeButton.addEventListener("click", () => {
   if (codeTimer !== null) return hideCode();
   const version = ++codeDisplayVersion;
-  showCodeButton.textContent = "Hide code";
+  showCodeButton.textContent = ISCTLocale.text("Hide code");
   codeTimer = setInterval(() => updateCode(version).catch((error) => {
     hideCode();
     status(error.message);
@@ -152,7 +163,9 @@ document.getElementById("removeSecret").addEventListener("click", () => act(asyn
   clearPassphrases();
   secretInput.value = "";
   await request({ type: "DELETE_KEY" });
-  status("Saved encrypted key and unlocked session key removed.");
+  document.getElementById("username").value = "";
+  document.getElementById("universityPassword").value = "";
+  status("Saved encrypted data and unlocked session data removed.");
 }));
 
 document.getElementById("connectGmail").addEventListener("click", () => act(async () => {
@@ -166,6 +179,8 @@ window.addEventListener("pagehide", () => {
   hideKey();
   clearPassphrases();
   secretInput.value = "";
+  document.getElementById("username").value = "";
+  document.getElementById("universityPassword").value = "";
 });
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {

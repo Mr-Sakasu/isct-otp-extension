@@ -1,6 +1,7 @@
 importScripts("core.js", "vault.js");
 
 const SITE_URL = /^https:\/\/isct\.ex-tic\.com\/auth\/session\/second_factor(?:[/?#]|$)/;
+const LOGIN_URL = /^https:\/\/isct\.ex-tic\.com\/auth\/session\/?(?:[?#]|$)/;
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me/messages";
 
 // Never expose encrypted storage or unlocked session secrets to content scripts.
@@ -58,8 +59,12 @@ function isSiteTab(sender) {
   return sender.id === chrome.runtime.id && !!sender.tab && SITE_URL.test(sender.url || "");
 }
 
+function isLoginTab(sender) {
+  return sender.id === chrome.runtime.id && !!sender.tab && LOGIN_URL.test(sender.url || "");
+}
+
 function isOptions(sender) {
-  return sender.id === chrome.runtime.id && sender.url === chrome.runtime.getURL("options.html");
+  return sender.id === chrome.runtime.id && ["options.html", "options.ja.html", "options.zh-CN.html"].some((page) => sender.url === chrome.runtime.getURL(page));
 }
 
 function gmailConfigured() {
@@ -120,6 +125,12 @@ async function handleMessage(request, sender) {
     return { connected: true };
   }
   if (isOptions(sender)) return withVault(() => handleOptions(request));
+  if (isLoginTab(sender)) return withVault(async () => {
+    if (request?.type !== "GET_LOGIN_VALUE" || !["username", "password"].includes(request.field)) return { error: "Request denied." };
+    const { vault } = await chrome.storage.local.get("vault");
+    const unlocked = await getUnlocked(vault);
+    return unlocked ? { value: unlocked.totp[request.field] || "", ...(request.field === "password" ? { account: unlocked.totp.username || "" } : {}) } : { value: "" };
+  });
   if (!isSiteTab(sender)) return { error: "Request denied." };
   return withVault(() => handleSiteMessage(request));
 }
@@ -159,19 +170,22 @@ async function handleOptions(request) {
   if (request?.type === "VAULT_STATUS") {
     const unlocked = await getUnlocked(settings.vault);
     return { mode: settings.mode || "totp", encrypted: !!settings.vault, legacy: !!settings.totp,
-      unlocked: !!unlocked, expiresAt: unlocked?.expiresAt || 0, gmailConnected: !!settings.gmailConnected };
+      unlocked: !!unlocked, expiresAt: unlocked?.expiresAt || 0, gmailConnected: !!settings.gmailConnected,
+      usernameSaved: !!unlocked?.totp.username, passwordSaved: !!unlocked?.totp.password };
   }
   if (request?.type === "SAVE_SETTINGS") {
     if (!["totp", "gmail"].includes(request.mode)) throw new Error("Choose an OTP method.");
-    if (request.secret || request.passphrase || settings.totp) {
+    if (request.secret || request.passphrase || request.username || request.password || settings.totp) {
       let totp;
-      if (request.secret) totp = ISCTOTP.parseTotpSecret(request.secret);
+      const unlocked = await getUnlocked(settings.vault);
+      if (request.secret) totp = { ...(unlocked?.totp || {}), ...ISCTOTP.parseTotpSecret(request.secret) };
       else if (settings.vault) {
-        const unlocked = await getUnlocked(settings.vault);
-        if (!unlocked) throw new Error("Unlock the saved key before changing its passphrase.");
-        totp = unlocked.totp;
+        if (!unlocked) throw new Error("Unlock the saved data before changing it.");
+        totp = { ...unlocked.totp };
       } else if (settings.totp) totp = ISCTVault.validateConfig(settings.totp);
       else throw new Error("Enter your setup key.");
+      if (request.username) totp.username = request.username;
+      if (request.password) totp.password = request.password;
       const vault = await ISCTVault.encryptVault(totp, request.passphrase);
       await chrome.storage.local.set({ mode: request.mode, vault });
       await chrome.storage.local.remove("totp");

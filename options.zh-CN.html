@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Science Tokyo 自动登录设置</title>
+  <style>
+    body { font: 16px/1.5 system-ui, sans-serif; max-width: 720px; margin: 3rem auto; padding: 0 1rem; color: #183044; }
+    h1 { font-size: 1.6rem; }
+    label { display: block; margin: 1.2rem 0 .4rem; font-weight: 650; }
+    input, select, button { font: inherit; }
+    input, select { box-sizing: border-box; width: 100%; padding: .65rem; border: 1px solid #8093a1; border-radius: 5px; }
+    button { margin: .8rem .4rem .3rem 0; padding: .6rem .9rem; border: 0; border-radius: 5px; background: #0870a8; color: white; cursor: pointer; }
+    button.secondary { background: #536575; }
+    section { border-top: 1px solid #d7e0e6; margin-top: 1.5rem; padding-top: .5rem; }
+    small { display: block; color: #485e6d; }
+    #status { min-height: 1.5rem; font-weight: 650; }
+  </style>
+</head>
+<body>
+  <nav aria-label="Language"><a href="options.html" lang="en">English</a> · <a href="options.ja.html" lang="ja">日本語</a> · <a href="options.zh-CN.html" lang="zh-CN">简体中文</a></nav>
+  <p><a href="help.zh-CN.html">图解设置指南</a></p>
+  <h1>Science Tokyo 自动登录设置</h1>
+  <p>解锁期间填写大学用户名和密码，随后提交OTP。目标网站为 <code>isct.ex-tic.com</code>。</p>
+
+  <label for="mode">OTP方式</label>
+  <select id="mode">
+    <option value="totp">设置密钥（TOTP）</option>
+    <option value="gmail">Gmail中的OTP邮件</option>
+  </select>
+
+  <section>
+    <h2>大学登录</h2>
+    <p>如需从第一页自动继续，请保存大学用户名和密码，它们与设置密钥一起加密。已有保存数据时请先解锁，再填写这两栏，并在下方输入和确认当前或新的加密口令后保存。</p>
+    <label for="username">大学用户名（Science Tokyo ID）</label>
+    <input id="username" type="text" autocomplete="off" spellcheck="false" maxlength="256" placeholder="留空以保留已保存的用户名">
+    <label for="universityPassword">大学登录密码</label>
+    <input id="universityPassword" type="password" autocomplete="off" spellcheck="false" maxlength="1024" placeholder="留空以保留已保存的密码">
+    <small id="loginState"></small>
+  </section>
+
+  <section>
+    <h2>设置密钥（TOTP）</h2>
+    <p>输入大学设置页面 <strong>显示密钥 / Show secret key</strong> 中显示的密钥。无需扫描二维码或注册手机应用。设置密钥不同于不断变化的六位代码，也不是Google密码。</p>
+    <label for="secret">设置密钥</label>
+    <input id="secret" type="password" autocomplete="off" spellcheck="false" placeholder="留空以保留已保存的密钥">
+    <label for="newPassphrase">保存用加密口令（至少6个字符）</label>
+    <input id="newPassphrase" type="password" autocomplete="off" spellcheck="false" placeholder="新增或修改保存数据时填写">
+    <label for="confirmPassphrase">确认加密口令</label>
+    <input id="confirmPassphrase" type="password" autocomplete="off" spellcheck="false">
+    <p>请选择至少6个字符的独有口令，较长的口令更难猜测。它与大学密码分开设置。点击下方 <strong>保存设置</strong> 加密保存。修改前先解锁，设置密钥栏保持为空。忘记口令后需要重新输入数据或在大学重新注册密钥。</p>
+    <small id="secretState" role="status"></small>
+    <label for="unlockPassphrase">解锁或查看已保存密钥的口令</label>
+    <input id="unlockPassphrase" type="password" autocomplete="off" spellcheck="false">
+    <button id="unlock" type="button">解锁30分钟</button>
+    <button id="lock" class="secondary" type="button">立即锁定</button>
+    <button id="showKey" class="secondary" type="button">显示已保存密钥30秒</button>
+    <input id="revealedKey" type="text" readonly hidden aria-label="已保存的设置密钥" autocomplete="off" spellcheck="false">
+    <button id="hideKey" class="secondary" type="button" hidden>隐藏已保存密钥</button>
+    <p>打开Chrome后解锁一次。30分钟后、浏览器重启或扩展重新加载、禁用时再次锁定。无需每次重新签发大学密钥。解锁后打开或重新加载 <code>https://isct.ex-tic.com/auth/session</code>。</p>
+    <p>如果大学要求首次注册代码，请先保存密钥，然后显示下方当前验证码，将其输入大学设置页面的“令牌”栏完成注册。</p>
+    <button id="showCode" class="secondary" type="button">显示当前验证码</button>
+    <output id="currentCode" aria-label="当前一次性代码"></output>
+    <small id="codeExpiry"></small>
+    <button id="removeSecret" class="secondary" type="button">删除已保存数据</button>
+    <p>用户名、大学密码和设置密钥使用AES-256-GCM加密保存在本机，不保存加密口令或加密密钥。解锁数据保存在会话内存中，不同步或上传至其他服务器。用户名、大学密码和OTP提交至大学的HTTPS表单，设置密钥和加密口令不会提交。清除浏览缓存不会删除密文，请使用 <strong>删除已保存数据</strong>。解锁期间设备或浏览器被控制时，数据仍可能被窃取。</p>
+  </section>
+
+  <section>
+    <h2>Gmail OTP邮件</h2>
+    <p>Gmail使用只读权限。请授权接收 <code>noreply@ex-tic.com</code> 邮件的Gmail账户。</p>
+    <button id="connectGmail" type="button">连接Gmail</button>
+    <small id="gmailState"></small>
+  </section>
+
+  <section>
+    <button id="save" type="button">保存设置</button>
+    <p id="status" role="status" aria-live="polite"></p>
+  </section>
+  <script src="options-i18n.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

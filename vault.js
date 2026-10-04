@@ -10,7 +10,16 @@
         !Number.isInteger(config.period) || config.digits !== 6) {
       throw new Error("Invalid saved setup key.");
     }
-    return otp.parseTotpSecret(`otpauth://totp/key?secret=${encodeURIComponent(config.secret)}&period=${config.period}&digits=${config.digits}`);
+    const normalized = otp.parseTotpSecret(`otpauth://totp/key?secret=${encodeURIComponent(config.secret)}&period=${config.period}&digits=${config.digits}`);
+    if (config.username !== undefined) {
+      if (typeof config.username !== "string" || !config.username.trim() || config.username.length > 256) throw new Error("Enter a valid university username.");
+      normalized.username = config.username.trim();
+    }
+    if (config.password !== undefined) {
+      if (typeof config.password !== "string" || !config.password || config.password.length > 1024 || !normalized.username) throw new Error("Enter a university username and password.");
+      normalized.password = config.password;
+    }
+    return normalized;
   }
 
   function bytes(value, length) {
@@ -33,8 +42,8 @@
   }
 
   async function encryptVault(config, passphrase) {
-    if (typeof passphrase !== "string" || [...passphrase].length < 12) {
-      throw new Error("Use a unique encryption passphrase of at least 12 characters.");
+    if (typeof passphrase !== "string" || [...passphrase].length < 6) {
+      throw new Error("Use a unique encryption passphrase of at least 6 characters.");
     }
     const normalized = validateConfig(config);
     const salt = crypto.getRandomValues(new Uint8Array(16));
@@ -51,7 +60,7 @@
   async function decryptVault(vault, passphrase) {
     if (!vault || vault.version !== 1 || vault.algorithm !== "AES-256-GCM" ||
         vault.kdf !== "PBKDF2-SHA256" || vault.iterations !== ITERATIONS ||
-        !Array.isArray(vault.ciphertext) || vault.ciphertext.length < 17 || vault.ciphertext.length > 4096) {
+        !Array.isArray(vault.ciphertext) || vault.ciphertext.length < 17 || vault.ciphertext.length > 16384) {
       throw new Error("Invalid encrypted key data.");
     }
     const salt = bytes(vault.salt, 16);

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Science Tokyo 自動ログイン設定</title>
+  <style>
+    body { font: 16px/1.5 system-ui, sans-serif; max-width: 720px; margin: 3rem auto; padding: 0 1rem; color: #183044; }
+    h1 { font-size: 1.6rem; }
+    label { display: block; margin: 1.2rem 0 .4rem; font-weight: 650; }
+    input, select, button { font: inherit; }
+    input, select { box-sizing: border-box; width: 100%; padding: .65rem; border: 1px solid #8093a1; border-radius: 5px; }
+    button { margin: .8rem .4rem .3rem 0; padding: .6rem .9rem; border: 0; border-radius: 5px; background: #0870a8; color: white; cursor: pointer; }
+    button.secondary { background: #536575; }
+    section { border-top: 1px solid #d7e0e6; margin-top: 1.5rem; padding-top: .5rem; }
+    small { display: block; color: #485e6d; }
+    #status { min-height: 1.5rem; font-weight: 650; }
+  </style>
+</head>
+<body>
+  <nav aria-label="Language"><a href="options.html" lang="en">English</a> · <a href="options.ja.html" lang="ja">日本語</a> · <a href="options.zh-CN.html" lang="zh-CN">简体中文</a></nav>
+  <p><a href="help.ja.html">画像付き設定ガイド</a></p>
+  <h1>Science Tokyo 自動ログイン設定</h1>
+  <p>解除中は大学のユーザー名・パスワードを入力し、続いてOTPを送信します。対象サイトは <code>isct.ex-tic.com</code> です。</p>
+
+  <label for="mode">OTP方式</label>
+  <select id="mode">
+    <option value="totp">設定キー（TOTP）</option>
+    <option value="gmail">GmailのOTPメール</option>
+  </select>
+
+  <section>
+    <h2>大学へのログイン</h2>
+    <p>最初の画面から自動で進めるには、大学のユーザー名とパスワードを保存します。設定キーと一緒に暗号化します。保存済みのデータがある場合は先に解除し、この2欄を入力して、下の暗号化用パスフレーズと確認欄に現在または新しいパスフレーズを入力して保存してください。</p>
+    <label for="username">大学のユーザー名（Science Tokyo ID）</label>
+    <input id="username" type="text" autocomplete="off" spellcheck="false" maxlength="256" placeholder="空欄なら保存済みのユーザー名を保持">
+    <label for="universityPassword">大学のログインパスワード</label>
+    <input id="universityPassword" type="password" autocomplete="off" spellcheck="false" maxlength="1024" placeholder="空欄なら保存済みのパスワードを保持">
+    <small id="loginState"></small>
+  </section>
+
+  <section>
+    <h2>設定キー（TOTP）</h2>
+    <p>大学の設定画面の <strong>シークレットキーを表示する / Show secret key</strong> で表示されたキーを入力します。QRの読み取りやスマートフォンアプリへの登録は不要です。設定キーは毎回変わる6桁のコードやGoogleのパスワードとは別です。</p>
+    <label for="secret">設定キー</label>
+    <input id="secret" type="password" autocomplete="off" spellcheck="false" placeholder="空欄なら保存済みの設定キーを保持">
+    <label for="newPassphrase">保存用の暗号化パスフレーズ（6文字以上）</label>
+    <input id="newPassphrase" type="password" autocomplete="off" spellcheck="false" placeholder="新規保存・変更時に入力">
+    <label for="confirmPassphrase">暗号化パスフレーズの確認</label>
+    <input id="confirmPassphrase" type="password" autocomplete="off" spellcheck="false">
+    <p>6文字以上の固有のパスフレーズを設定してください。長いほど推測されにくくなります。大学のパスワードとは別のものです。下の <strong>設定を保存</strong> で暗号化して保存します。変更時は先に解除し、設定キー欄は空欄にします。忘れた場合は情報を入力し直すか、大学側で設定キーを再登録してください。</p>
+    <small id="secretState" role="status"></small>
+    <label for="unlockPassphrase">解除・保存したキーの確認用パスフレーズ</label>
+    <input id="unlockPassphrase" type="password" autocomplete="off" spellcheck="false">
+    <button id="unlock" type="button">30分間解除</button>
+    <button id="lock" class="secondary" type="button">今すぐロック</button>
+    <button id="showKey" class="secondary" type="button">保存したキーを30秒表示</button>
+    <input id="revealedKey" type="text" readonly hidden aria-label="保存した設定キー" autocomplete="off" spellcheck="false">
+    <button id="hideKey" class="secondary" type="button" hidden>保存したキーを隠す</button>
+    <p>Chrome起動後に一度解除します。30分後、Chrome再起動時、拡張機能の再読み込み・無効化時に再ロックします。大学のシークレットキーを毎回発行する必要はありません。解除後、<code>https://isct.ex-tic.com/auth/session</code> を開くか再読み込みしてください。</p>
+    <p>大学側の初回登録でコードを求められたら、先にキーを保存し、下の現在のコードを大学の設定画面の「トークン」欄に入力して登録を完了してください。</p>
+    <button id="showCode" class="secondary" type="button">現在のコードを表示</button>
+    <output id="currentCode" aria-label="現在のワンタイムコード"></output>
+    <small id="codeExpiry"></small>
+    <button id="removeSecret" class="secondary" type="button">保存したデータを削除</button>
+    <p>ユーザー名・大学のパスワード・設定キーはAES-256-GCMで暗号化して端末内に保存します。暗号化用パスフレーズと暗号鍵は保存しません。解除中のデータはセッションメモリに保持します。同期や他のサーバーへのアップロードはしません。ユーザー名・大学のパスワード・OTPは大学のHTTPSフォームへ送信します。設定キーと暗号化用パスフレーズは送信しません。閲覧キャッシュの削除では暗号データは消えないため、<strong>保存したデータを削除</strong> を使ってください。解除中の端末やブラウザを制御されると情報を盗まれる可能性は残ります。</p>
+  </section>
+
+  <section>
+    <h2>GmailのOTPメール</h2>
+    <p>Gmailの読み取り専用権限を使います。<code>noreply@ex-tic.com</code> からメールを受け取るGmailアカウントを認可してください。</p>
+    <button id="connectGmail" type="button">Gmailを接続</button>
+    <small id="gmailState"></small>
+  </section>
+
+  <section>
+    <button id="save" type="button">設定を保存</button>
+    <p id="status" role="status" aria-live="polite"></p>
+  </section>
+  <script src="options-i18n.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

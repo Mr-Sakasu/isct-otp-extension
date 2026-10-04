@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Science Tokyo OTP Autofill",
-  "version": "0.3.0",
-  "description": "Fill and submit your own Science Tokyo OTP using an authenticator key or a Gmail OTP email.",
+  "version": "0.4.0",
+  "description": "Automatically enter your encrypted Science Tokyo username, password, and OTP while unlocked.",
   "minimum_chrome_version": "105",
   "action": {"default_title": "Science Tokyo OTP settings"},
   "permissions": ["storage", "identity", "alarms"],
@@ -15,6 +15,10 @@
   "content_scripts": [{
     "matches": ["https://isct.ex-tic.com/auth/session/second_factor*"],
     "js": ["content_script.js"],
+    "run_at": "document_idle"
+  }, {
+    "matches": ["https://isct.ex-tic.com/auth/session", "https://isct.ex-tic.com/auth/session?*"],
+    "js": ["login_script.js"],
     "run_at": "document_idle"
   }],
   "options_ui": {"page": "options.html", "open_in_tab": true}
