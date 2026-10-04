@@ -31,11 +31,11 @@ Keep the extension ID stable. If you distribute it publicly, use the published e
 
 - The form is behind sign-in, so its live DOM could not be inspected without an account. The content script only runs on the second-factor path and looks for an OTP field and **Next** button. If the site changes its markup, update `content_script.js`.
 - This repository contains no personal Gmail address, Gmail password, email content, or authenticator key. Google handles Gmail sign-in. Each user must grant Gmail read-only access for the Gmail method.
-- The authenticator key is stored in Chrome's local extension storage, not synced and not sent to a server. Anyone with access to this browser profile or a compromised device could obtain it. Automatic second-factor entry weakens the account protection on this device.
+- The authenticator key is stored in Chrome's local extension storage, which [Chrome says is not encrypted](https://developer.chrome.com/docs/extensions/develop/security-privacy/user-privacy). It is not synced or sent to a server. Anyone with access to this browser profile or a compromised device could obtain it. Automatic second-factor entry weakens the account protection on this device.
 - Gmail codes are accepted only when their From header matches the documented sender, their subject and OTP label match, they arrived around the send action, and they have not already been used by this extension in the current browser session.
 - This extension has not been tested against a live authenticated Science Tokyo login. Test it with your own account before sharing it.
 
-Run local checks with `node --test test/core.test.js` and `node --check` on the JavaScript files.
+Run local checks with `node --test test/core.test.js` and `node --check` on the JavaScript files. The browser smoke test is described below.
 
 Sources: [Science Tokyo login guide](https://www.helpdesk.cii.isct.ac.jp/st/helpdesk/science-tokyo/login-en.html), [Chrome OAuth guide](https://developer.chrome.com/docs/extensions/how-to/integrate/oauth), [Gmail API scopes](https://developers.google.com/workspace/gmail/api/auth/scopes).
 
@@ -63,7 +63,7 @@ Sources: [Science Tokyo login guide](https://www.helpdesk.cii.isct.ac.jp/st/help
 
 ### 個人情報と制限
 
-- Gmailアドレス、Gmailパスワード、メール本文、認証アプリの設定キーはこのリポジトリに含めません。GoogleへのログインはGoogleの画面で行います。設定キーはChromeの**拡張機能のローカルストレージ**に保存され、拡張機能による同期や外部送信はしません。ただし、この端末やブラウザのプロファイルにアクセスできる人には漏れる可能性があります。
+- Gmailアドレス、Gmailパスワード、メール本文、認証アプリの設定キーはこのリポジトリに含めません。GoogleへのログインはGoogleの画面で行います。設定キーはChromeの**拡張機能のローカルストレージ**に保存され、拡張機能による同期や外部送信はしません。ただし、[Chromeのローカルストレージは暗号化されない](https://developer.chrome.com/docs/extensions/develop/security-privacy/user-privacy)ため、この端末やブラウザのプロファイルにアクセスできる人には漏れる可能性があります。
 - 自動入力すると、この端末上では二段階認証の効果が弱まります。自分のアカウントと信頼できる端末で使ってください。
 - 認証画面はログイン後にしか表示できないため、実際の認証済み画面では未検証です。サイトのHTMLが変わると `content_script.js` の修正が必要になる場合があります。
 
@@ -91,6 +91,16 @@ Sources: [Science Tokyo login guide](https://www.helpdesk.cii.isct.ac.jp/st/help
 
 ### 隐私与限制
 
-- 此仓库不包含Gmail地址、Gmail密码、邮件内容或身份验证器密钥。Google登录在Google页面完成。设置密钥保存在Chrome的**扩展本地存储**中，不会由此扩展同步或上传；能够访问该设备或浏览器配置文件的人仍可能获取它。
+- 此仓库不包含Gmail地址、Gmail密码、邮件内容或身份验证器密钥。Google登录在Google页面完成。设置密钥保存在Chrome的**扩展本地存储**中，不会由此扩展同步或上传；但[Chrome的本地扩展存储未加密](https://developer.chrome.com/docs/extensions/develop/security-privacy/user-privacy)，能够访问该设备或浏览器配置文件的人仍可能获取它。
 - 自动填写会削弱此设备上的第二重验证。请仅用于自己的账户和可信设备。
 - 验证表单需要登录后才能查看，因此尚未在真实登录状态下测试。网站HTML变更时，可能需要修改 `content_script.js`。
+
+## Browser test / ブラウザテスト / 浏览器测试
+
+Use Chromium or Chrome for Testing to run the browser smoke test. Official Chrome builds no longer support command-line extension loading. The test uses a mock form and mock email at the second-factor URL; it does **not** contact a real account or Gmail inbox. / Chromium または Chrome for Testing で実行してください。模擬フォームと模擬メールを使い、実際のアカウントやGmailにはアクセスしません。/ 请使用Chromium或Chrome for Testing。测试只使用模拟表单和模拟邮件，不访问真实账户或Gmail邮箱。
+
+```sh
+CHROME_BIN=/path/to/chrome-for-testing node test/browser-smoke.mjs
+```
+
+Source for the Chrome testing requirement: [Chromium Extensions announcement](https://groups.google.com/a/chromium.org/g/chromium-extensions/c/1-g8EFx2BBY/m/S0ET5wPjCAAJ).
