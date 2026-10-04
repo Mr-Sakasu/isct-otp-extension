@@ -23,17 +23,35 @@
 
   <label for="mode">OTP method</label>
   <select id="mode">
-    <option value="totp">Authenticator app</option>
+    <option value="totp">Setup key (TOTP)</option>
     <option value="gmail">OTP email in Gmail</option>
   </select>
 
   <section>
-    <h2>Authenticator app</h2>
-    <p>The setup key is the secret encoded in the QR code used to register your authenticator. Enter the Base32 key or an <code>otpauth://totp</code> link. This is different from the changing six-digit code and your Google password. The extension generates codes from this key; it cannot read your phone's authenticator app.</p>
-    <label for="secret">Setup key or otpauth link</label>
+    <h2>Setup key (TOTP)</h2>
+    <p>Enter the key shown by <strong>Show secret key</strong> on the university's setup page. No QR scan or phone app is required: this extension generates the codes locally. This key is different from the changing six-digit code and your Google password.</p>
+    <label for="secret">Setup key</label>
     <input id="secret" type="password" autocomplete="off" spellcheck="false" placeholder="Leave blank to keep the saved key">
-    <small id="secretState"></small>
+    <label for="newPassphrase">New encryption passphrase (at least 12 characters)</label>
+    <input id="newPassphrase" type="password" autocomplete="off" spellcheck="false" placeholder="Required when saving or changing a key">
+    <label for="confirmPassphrase">Confirm new passphrase</label>
+    <input id="confirmPassphrase" type="password" autocomplete="off" spellcheck="false">
+    <p>Choose a long, unique passphrase. It is not your university password. Click <strong>Save settings</strong> below to encrypt and save the key. To change the passphrase, unlock first and leave Setup key blank. If you forget the passphrase, you must enter the original key again or enroll a new one at the university.</p>
+    <small id="secretState" role="status"></small>
+    <label for="unlockPassphrase">Passphrase to unlock or view the saved key</label>
+    <input id="unlockPassphrase" type="password" autocomplete="off" spellcheck="false">
+    <button id="unlock" type="button">Unlock for 30 minutes</button>
+    <button id="lock" class="secondary" type="button">Lock now</button>
+    <button id="showKey" class="secondary" type="button">Show saved key for 30 seconds</button>
+    <input id="revealedKey" type="text" readonly hidden aria-label="Saved setup key" autocomplete="off" spellcheck="false">
+    <button id="hideKey" class="secondary" type="button" hidden>Hide saved key</button>
+    <p>Unlock once after opening Chrome. It locks again after 30 minutes, on browser restart, or when the extension is reloaded or disabled. No new university secret key is needed. When you unlock, reopen or reload the university's second-factor page to start automatic entry.</p>
+    <p>If the university asks for a code to finish enrollment, save the key first, then show the current code below and enter it on the university's setup page.</p>
+    <button id="showCode" class="secondary" type="button">Show current code</button>
+    <output id="currentCode" aria-label="Current one-time code"></output>
+    <small id="codeExpiry"></small>
     <button id="removeSecret" class="secondary" type="button">Remove saved key</button>
+    <p>The key is saved locally with AES-256-GCM encryption. Your passphrase and encryption key are not saved. While unlocked, the setup key is held in the extension's session memory. It is not uploaded or synced. Clearing browsing cache does not remove the encrypted key; use <strong>Remove saved key</strong>. Only the generated code is submitted to the university. Malware or someone controlling this browser while unlocked can still obtain the key.</p>
   </section>
 
   <section>
@@ -47,7 +65,6 @@
     <button id="save" type="button">Save settings</button>
     <p id="status" role="status" aria-live="polite"></p>
   </section>
-  <script src="core.js"></script>
   <script src="options.js"></script>
 </body>
 </html>

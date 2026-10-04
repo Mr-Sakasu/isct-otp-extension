@@ -1,10 +1,57 @@
-importScripts("core.js");
+importScripts("core.js", "vault.js");
 
 const SITE_URL = /^https:\/\/isct\.ex-tic\.com\/auth\/session\/second_factor(?:[/?#]|$)/;
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me/messages";
 
-// The page can request a code, but cannot read the stored authenticator key.
-chrome.storage.local.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" });
+// Never expose encrypted storage or unlocked session secrets to content scripts.
+const storageReady = Promise.all([
+  chrome.storage.local.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" }),
+  chrome.storage.session.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" })
+]);
+const LOCK_ALARM = "otp-vault-auto-lock";
+const UNLOCK_MS = 30 * 60 * 1000;
+let vaultQueue = Promise.resolve();
+
+function withVault(operation) {
+  const next = vaultQueue.then(operation);
+  vaultQueue = next.catch(() => {});
+  return next;
+}
+
+async function lockVault() {
+  await chrome.storage.session.remove("unlockedVault");
+  await chrome.alarms.clear(LOCK_ALARM);
+}
+
+function vaultTag(vault) {
+  // Chrome's storage serialization may reorder object properties.
+  return JSON.stringify([vault.version, vault.algorithm, vault.kdf, vault.iterations, vault.salt, vault.iv, vault.ciphertext]);
+}
+
+async function unlockForSession(vault, totp) {
+  const expiresAt = Date.now() + UNLOCK_MS;
+  await chrome.storage.session.set({ unlockedVault: { vaultTag: vaultTag(vault), totp, expiresAt } });
+  await chrome.alarms.create(LOCK_ALARM, { when: expiresAt });
+}
+
+async function getUnlocked(vault) {
+  const { unlockedVault } = await chrome.storage.session.get("unlockedVault");
+  if (!vault || !unlockedVault || unlockedVault.vaultTag !== vaultTag(vault) || unlockedVault.expiresAt <= Date.now()) {
+    if (unlockedVault) await lockVault();
+    return null;
+  }
+  return unlockedVault;
+}
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name !== LOCK_ALARM) return;
+  withVault(async () => {
+    await storageReady;
+    const { unlockedVault } = await chrome.storage.session.get("unlockedVault");
+    if (unlockedVault && unlockedVault.expiresAt <= Date.now()) await lockVault();
+  }).catch(() => {});
+});
+
 chrome.action.onClicked.addListener(() => chrome.runtime.openOptionsPage());
 
 function isSiteTab(sender) {
@@ -26,7 +73,7 @@ async function getToken(interactive) {
 }
 
 async function gmailJson(url, token) {
-  const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+  const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store", signal: AbortSignal.timeout(15000) });
   if (!response.ok) throw new Error(`Gmail request failed (${response.status}).`);
   return response.json();
 }
@@ -64,6 +111,7 @@ async function getGmailCode(since) {
 }
 
 async function handleMessage(request, sender) {
+  await storageReady;
   if (request?.type === "CONNECT_GMAIL" && isOptions(sender)) {
     if (!gmailConfigured()) throw new Error("Set the Google OAuth client ID in manifest.json first.");
     const token = await getToken(true);
@@ -71,11 +119,16 @@ async function handleMessage(request, sender) {
     await chrome.storage.local.set({ gmailConnected: true });
     return { connected: true };
   }
+  if (isOptions(sender)) return withVault(() => handleOptions(request));
   if (!isSiteTab(sender)) return { error: "Request denied." };
-  const settings = await chrome.storage.local.get(["mode", "totp", "gmailConnected"]);
+  return withVault(() => handleSiteMessage(request));
+}
+
+async function handleSiteMessage(request) {
+  const settings = await chrome.storage.local.get(["mode", "vault", "gmailConnected"]);
   const mode = settings.mode || "totp";
   if (request?.type === "GET_STATUS") {
-    if (mode === "totp") return { mode, ready: !!settings.totp };
+    if (mode === "totp") return { mode, ready: !!(await getUnlocked(settings.vault)) };
     if (!gmailConfigured() || !settings.gmailConnected) return { mode, ready: false };
     try {
       await getToken(false);
@@ -86,9 +139,9 @@ async function handleMessage(request, sender) {
   }
   if (request?.type !== "GET_CODE") return { error: "Unknown request." };
   if (mode === "totp") {
-    if (!settings.totp) return { error: "Add an authenticator setup key in the extension options." };
-    const now = Date.now();
-    const result = await ISCTOTP.generateTotp(settings.totp, now);
+    const unlocked = await getUnlocked(settings.vault);
+    if (!unlocked) return { error: "Unlock your encrypted setup key in the extension options first." };
+    const result = await ISCTOTP.generateTotp(unlocked.totp);
     return result.remainingSeconds < 6 ? { pending: true } : { code: result.code };
   }
   if (mode === "gmail") {
@@ -99,6 +152,62 @@ async function handleMessage(request, sender) {
     return code ? { code } : { pending: true };
   }
   return { error: "Choose an OTP method in the extension options." };
+}
+
+async function handleOptions(request) {
+  const settings = await chrome.storage.local.get(["mode", "vault", "totp", "gmailConnected"]);
+  if (request?.type === "VAULT_STATUS") {
+    const unlocked = await getUnlocked(settings.vault);
+    return { mode: settings.mode || "totp", encrypted: !!settings.vault, legacy: !!settings.totp,
+      unlocked: !!unlocked, expiresAt: unlocked?.expiresAt || 0, gmailConnected: !!settings.gmailConnected };
+  }
+  if (request?.type === "SAVE_SETTINGS") {
+    if (!["totp", "gmail"].includes(request.mode)) throw new Error("Choose an OTP method.");
+    if (request.secret || request.passphrase || settings.totp) {
+      let totp;
+      if (request.secret) totp = ISCTOTP.parseTotpSecret(request.secret);
+      else if (settings.vault) {
+        const unlocked = await getUnlocked(settings.vault);
+        if (!unlocked) throw new Error("Unlock the saved key before changing its passphrase.");
+        totp = unlocked.totp;
+      } else if (settings.totp) totp = ISCTVault.validateConfig(settings.totp);
+      else throw new Error("Enter your setup key.");
+      const vault = await ISCTVault.encryptVault(totp, request.passphrase);
+      await chrome.storage.local.set({ mode: request.mode, vault });
+      await chrome.storage.local.remove("totp");
+      await unlockForSession(vault, totp);
+    } else {
+      if (request.mode === "totp" && !settings.vault) throw new Error("Enter a setup key and a new encryption passphrase first.");
+      await chrome.storage.local.set({ mode: request.mode });
+    }
+    return { saved: true };
+  }
+  if (request?.type === "UNLOCK_VAULT") {
+    if (!settings.vault) throw new Error("Save an encrypted setup key first.");
+    const totp = await ISCTVault.decryptVault(settings.vault, request.passphrase);
+    await unlockForSession(settings.vault, totp);
+    return { unlocked: true };
+  }
+  if (request?.type === "LOCK_VAULT") {
+    await lockVault();
+    return { locked: true };
+  }
+  if (request?.type === "REVEAL_KEY") {
+    if (!settings.vault) throw new Error("Save an encrypted setup key first.");
+    const totp = await ISCTVault.decryptVault(settings.vault, request.passphrase);
+    return { secret: totp.secret };
+  }
+  if (request?.type === "GET_LOCAL_CODE") {
+    const unlocked = await getUnlocked(settings.vault);
+    if (!unlocked) throw new Error("Unlock the saved key first.");
+    return ISCTOTP.generateTotp(unlocked.totp);
+  }
+  if (request?.type === "DELETE_KEY") {
+    await lockVault();
+    await chrome.storage.local.remove(["vault", "totp"]);
+    return { removed: true };
+  }
+  return { error: "Unknown request." };
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
