@@ -425,7 +425,7 @@ try {
     assert.deepEqual(await evaluate(page, '[...document.querySelectorAll("nav a")].map(a=>a.getAttribute("href"))'), ["options.html", "options.ja.html", "options.zh-CN.html"]);
     await evaluate(page, 'document.getElementById("showCode").click()');
     await waitForUi('/^[0-9]{6}$/.test(document.getElementById("currentCode").textContent)', `localized code ${language}`);
-    if (language === "ja") assert.match(await evaluate(page, 'document.getElementById("codeExpiry").textContent'), /秒後/);
+    if (language === "ja") assert.match(await evaluate(page, 'document.getElementById("codeExpiry").textContent'), /[0-9]+秒/);
     if (language === "zh-CN") assert.match(await evaluate(page, 'document.getElementById("codeExpiry").textContent'), /秒后/);
     await evaluate(page, 'document.getElementById("showCode").click()');
   }
@@ -438,6 +438,28 @@ try {
     assert.match(await evaluate(page, "document.body.textContent"), /App Authentication/);
     assert.match(await evaluate(page, "document.body.textContent"), /Remove/);
     if (language === "ja") {
+      const overflow = await evaluate(page, `(async () => {
+        const overflow = [];
+        for (const image of document.images) {
+          const source = await fetch(image.src).then(response => response.text());
+          const svg = new DOMParser().parseFromString(source, "image/svg+xml").documentElement;
+          const holder = document.createElement("div");
+          holder.style.cssText = "position:absolute;visibility:hidden;left:0;top:0";
+          holder.append(svg);
+          document.body.append(holder);
+          await document.fonts.ready;
+          const { width, height } = svg.viewBox.baseVal;
+          for (const text of svg.querySelectorAll("text")) {
+            const box = text.getBBox();
+            if (box.x < 0 || box.y < 0 || box.x + box.width > width + 1 || box.y + box.height > height + 1) {
+              overflow.push({ image: image.getAttribute("src"), text: text.textContent });
+            }
+          }
+          holder.remove();
+        }
+        return overflow;
+      })()`);
+      assert.deepEqual(overflow, [], "Japanese illustration text must remain within the image");
       const { data } = await page.send("Page.captureScreenshot", { captureBeyondViewport: true });
       await writeFile(path.join(profile, "guide-ja.png"), Buffer.from(data, "base64"));
     }
