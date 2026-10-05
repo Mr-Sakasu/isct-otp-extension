@@ -13,6 +13,7 @@ const require = createRequire(import.meta.url);
 const { generateTotp, parseTotpSecret } = require("../core.js");
 const extensionDirectory = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const fixtureHtml = await readFile(new URL("./fixtures/second-factor.html", import.meta.url), "utf8");
+const chromeManifest = JSON.parse(await readFile(new URL("../manifest.json", import.meta.url), "utf8"));
 const loginHtml = await readFile(new URL("./fixtures/login.html", import.meta.url), "utf8");
 const profile = await mkdtemp(path.join(os.tmpdir(), "isct-otp-browser-"));
 const port = 20000 + Math.floor(Math.random() * 20000);
@@ -172,7 +173,6 @@ try {
     ]
   });
 
-  await evaluate(worker, 'chrome.storage.local.set({mode:"totp"})');
   await evaluate(worker, 'chrome.storage.local.remove("totp")');
   await navigateWithMock(fixtureHtml.replace('data-test-case="fixture"', 'data-test-case="unconfigured"'), "unconfigured");
   await delay(500);
@@ -186,7 +186,7 @@ try {
   const config = parseTotpSecret(secret);
   const passphrase = "test-only browser passphrase with several words";
   await evaluate(worker, 'globalThis.networkCalls=0;globalThis.fetch=async()=>{networkCalls++;throw new Error("Unexpected network request during TOTP test")};');
-  await evaluate(worker, `chrome.storage.local.set({mode:"totp",totp:{secret:"${secret}",period:30,digits:6}})`);
+  await evaluate(worker, `chrome.storage.local.set({totp:{secret:"${secret}",period:30,digits:6}})`);
   await navigateWithMock(fixtureHtml.replace('data-test-case="fixture"', 'data-test-case="legacy"'), "legacy");
   await delay(500);
   assert.equal((await evaluate(page, "fixtureResult")).submitCount, 0);
@@ -371,45 +371,28 @@ try {
   assert.equal(await evaluate(worker, "networkCalls"), 0);
   console.log("TOTP privacy: no fetch requests; content script cannot access encrypted local storage or unlocked session storage.");
 
-  const emailCode = "44059";
-  const emailBody = Buffer.from(`ワンタイムパスワード：${emailCode}`).toString("base64url");
-  const mockMessage = {
-    id: "mock-email-1",
-    internalDate: String(Date.now()),
-    payload: {
-      headers: [
-        { name: "From", value: "Extic <noreply@ex-tic.com>" },
-        { name: "Subject", value: "Extic ログイン用ワンタイムパスワード" }
-      ],
-      mimeType: "text/plain",
-      body: { data: emailBody }
-    }
-  };
-  await evaluate(worker, `chrome.storage.local.set({mode:"gmail",gmailConnected:true})`);
-  await evaluate(worker, `getToken=async()=>"mock-token";gmailConfigured=()=>true;gmailJson=async(url)=>url.includes("format=full")?${JSON.stringify(mockMessage)}:{messages:[{id:"mock-email-1"}]}`);
-  const gmailHtml = fixtureHtml.replace('data-test-case="fixture"', 'data-test-case="gmail"');
-  await navigateWithMock(gmailHtml, "gmail");
-  const gmailResult = await waitForSubmission();
-  assert.equal(gmailResult.code, emailCode);
-  assert.equal(gmailResult.sent, "yes");
-  const emailFormResult = await evaluate(page, "fixtureResult");
-  assert.equal(emailFormResult.selected, "emailotp-form-selector");
-  assert.equal(emailFormResult.selectionCount, 1);
-  assert.equal(emailFormResult.formId, "emailotp-form");
-  assert.equal(emailFormResult.fields.emailotp, emailCode);
-  assert.equal(emailFormResult.fields.authenticity_token, "TEST-CSRF-TOKEN");
-  assert.equal(emailFormResult.sendCount, 1);
-  assert.equal(emailFormResult.submitCount, 1);
-  assert.equal(emailFormResult.otherSubmits, 0);
-  console.log("Gmail mock: email method selected, send clicked, correct form submitted once.");
+  // Old versions could select email mode; that stored preference must not disable TOTP.
+  await evaluate(worker, 'chrome.storage.local.set({mode:"gmail",gmailConnected:true})');
+  await navigateWithMock(fixtureHtml.replace('data-test-case="fixture"', 'data-test-case="old-preference"'), "old-preference");
+  await waitForSubmission();
+  const oldPreferenceResult = await evaluate(page, "fixtureResult");
+  assert.equal(oldPreferenceResult.selected, "totp-form-selector");
+  assert.equal(oldPreferenceResult.formId, "totp-form");
+  assert.equal(oldPreferenceResult.sendCount, 0);
+  assert.equal(oldPreferenceResult.submitCount, 1);
+  assert.equal(await evaluate(worker, "networkCalls"), 0);
+  assert.equal(chromeManifest.oauth2, undefined);
+  assert.equal(chromeManifest.host_permissions, undefined);
+  assert.deepEqual(chromeManifest.permissions, ["storage", "alarms"]);
+  console.log("Setup-key only: obsolete email preference ignored, no email sent, no OAuth or mailbox permissions.");
 
-  await evaluate(worker, 'chrome.storage.local.set({mode:"totp"})');
   assert.ok((await evaluate(worker, 'chrome.storage.session.get("unlockedVault")')).unlockedVault);
   await stopChrome();
   chrome = startChrome();
   await connectChrome();
   assert.deepEqual((await evaluate(worker, 'chrome.storage.local.get("vault")')).vault, localRecord.vault);
   assert.equal((await evaluate(worker, 'chrome.storage.session.get("unlockedVault")')).unlockedVault, undefined);
+  assert.deepEqual(await evaluate(worker, 'chrome.storage.local.get(["mode", "gmailConnected"])'), {});
   await navigateOptions();
   assert.equal((await optionsCall({ type: "VAULT_STATUS" })).unlocked, false);
   assert.equal((await optionsCall({ type: "UNLOCK_VAULT", passphrase })).unlocked, true);
@@ -437,6 +420,7 @@ try {
     await page.send("Page.navigate", { url });
     await waitForUi('!!document.getElementById("secretState")?.textContent', `options language ${language}`);
     assert.equal(await evaluate(page, "document.documentElement.lang"), language);
+    assert.equal(await evaluate(page, '!!document.getElementById("mode") || !!document.getElementById("connectGmail") || /gmail|oauth/i.test(document.body.textContent)'), false);
     assert.equal((await optionsCall({ type: "VAULT_STATUS" })).unlocked, true);
     assert.deepEqual(await evaluate(page, '[...document.querySelectorAll("nav a")].map(a=>a.getAttribute("href"))'), ["options.html", "options.ja.html", "options.zh-CN.html"]);
     await evaluate(page, 'document.getElementById("showCode").click()');
