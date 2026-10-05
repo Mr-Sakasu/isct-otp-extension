@@ -1,4 +1,4 @@
-/* Pure OTP and email parsing helpers. No credential or network access here. */
+/* Pure TOTP helpers. No credential or network access here. */
 (function (root) {
   "use strict";
 
@@ -55,34 +55,7 @@
     };
   }
 
-  function decodeUrlBase64(data) {
-    const base64 = data.replace(/-/g, "+").replace(/_/g, "/");
-    const binary = atob(base64);
-    return new TextDecoder().decode(Uint8Array.from(binary, (character) => character.charCodeAt(0)));
-  }
-
-  function collectTextParts(part, output = []) {
-    if (!part) return output;
-    if (part.mimeType === "text/plain" && part.body?.data) output.push(decodeUrlBase64(part.body.data));
-    for (const child of part.parts || []) collectTextParts(child, output);
-    return output;
-  }
-
-  function getHeader(message, name) {
-    return (message.payload?.headers || []).find((header) => header.name?.toLowerCase() === name)?.value || "";
-  }
-
-  function parseOtpEmail(message) {
-    const sender = getHeader(message, "from");
-    const subject = getHeader(message, "subject");
-    if (!/(?:^|<)noreply@ex-tic\.com(?:>|$)/i.test(sender)) return null;
-    if (!/(?:Extic|ex-tic).*?(?:ワンタイムパスワード|one[- ]time password|OTP)/i.test(subject)) return null;
-    const text = collectTextParts(message.payload).join("\n") || message.snippet || "";
-    const match = text.match(/(?:ワンタイムパスワード|one[- ]time password)\s*[:：]\s*([0-9]{4,8})(?![0-9])/i);
-    return match ? match[1] : null;
-  }
-
-  const api = { parseTotpSecret, generateTotp, parseOtpEmail };
+  const api = { parseTotpSecret, generateTotp };
   root.ISCTOTP = api;
   if (typeof module !== "undefined") module.exports = api;
 })(globalThis);

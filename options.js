@@ -1,4 +1,3 @@
-const modeInput = document.getElementById("mode");
 const secretInput = document.getElementById("secret");
 const statusText = document.getElementById("status");
 const showCodeButton = document.getElementById("showCode");
@@ -43,7 +42,6 @@ function clearPassphrases() {
 
 async function refresh() {
   const settings = await request({ type: "VAULT_STATUS" });
-  modeInput.value = settings.mode;
   const state = document.getElementById("secretState");
   if (settings.legacy) {
     state.textContent = "An older unencrypted key remains. Set and confirm a new passphrase, then Save settings to encrypt it. Leave Setup key blank to keep that key.";
@@ -55,8 +53,6 @@ async function refresh() {
   document.getElementById("lock").disabled = !settings.unlocked;
   document.getElementById("showKey").disabled = !settings.encrypted;
   showCodeButton.disabled = !settings.unlocked;
-  document.getElementById("gmailState").textContent = settings.gmailConnected ? "Gmail was connected on this browser." : "Gmail is not connected yet.";
-  document.getElementById("gmailState").textContent = ISCTLocale.text(document.getElementById("gmailState").textContent);
   document.getElementById("loginState").textContent = !settings.unlocked ? "Unlock saved data to check the login settings." :
     settings.passwordSaved ? "Username and university password saved for automatic login." :
     settings.usernameSaved ? "Username saved. University password is not saved yet." : "No university login credentials saved.";
@@ -88,7 +84,7 @@ document.getElementById("save").addEventListener("click", () => act(async () => 
   const passphrase = document.getElementById("newPassphrase").value;
   const confirmation = document.getElementById("confirmPassphrase").value;
   if (passphrase !== confirmation) throw new Error("The new passphrases do not match.");
-  const message = { type: "SAVE_SETTINGS", mode: modeInput.value, secret: secretInput.value.trim(), passphrase,
+  const message = { type: "SAVE_SETTINGS", secret: secretInput.value.trim(), passphrase,
     username: document.getElementById("username").value.trim(), password: document.getElementById("universityPassword").value };
   clearPassphrases();
   status("Saving settings…");
@@ -166,12 +162,6 @@ document.getElementById("removeSecret").addEventListener("click", () => act(asyn
   document.getElementById("username").value = "";
   document.getElementById("universityPassword").value = "";
   status("Saved encrypted data and unlocked session data removed.");
-}));
-
-document.getElementById("connectGmail").addEventListener("click", () => act(async () => {
-  status("Opening Google authorization…");
-  await request({ type: "CONNECT_GMAIL" });
-  status("Gmail connected.");
 }));
 
 window.addEventListener("pagehide", () => {

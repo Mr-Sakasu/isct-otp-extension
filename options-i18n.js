@@ -6,8 +6,6 @@ const ISCTLocale = (() => {
     "No setup key saved.": ["設定キーは未保存です。", "尚未保存设置密钥。"],
     "Encrypted setup key saved. Locked.": ["暗号化した設定キーを保存済みです。現在はロック中です。", "已保存加密密钥，目前已锁定。"],
     "An older unencrypted key remains. Set and confirm a new passphrase, then Save settings to encrypt it. Leave Setup key blank to keep that key.": ["旧版の平文キーが残っています。設定キー欄は空のまま、暗号化用パスフレーズと確認欄を入力して保存すると暗号化へ移行できます。", "仍保留旧版明文密钥。请保持设置密钥栏为空，填写并确认加密口令后保存以迁移。"],
-    "Gmail was connected on this browser.": ["このブラウザでGmailを接続済みです。", "此浏览器已连接Gmail。"],
-    "Gmail is not connected yet.": ["Gmailは未接続です。", "尚未连接Gmail。"],
     "Unlock saved data to check the login settings.": ["保存したデータを解除すると、ログイン情報の保存状態を確認できます。", "解锁已保存数据后可查看登录信息状态。"],
     "Username and university password saved for automatic login.": ["自動ログイン用のユーザー名と大学のパスワードを保存済みです。", "已保存自动登录用的用户名和大学密码。"],
     "Username saved. University password is not saved yet.": ["ユーザー名を保存済みです。大学のパスワードは未保存です。", "已保存用户名，尚未保存大学密码。"],
@@ -21,8 +19,6 @@ const ISCTLocale = (() => {
     "Verifying passphrase…": ["パスフレーズを確認しています…", "正在验证口令…"],
     "Saved key shown for 30 seconds. Hide it when finished.": ["保存したキーを30秒間表示します。確認後は隠してください。", "已保存密钥显示30秒，查看后请隐藏。"],
     "Saved encrypted data and unlocked session data removed.": ["保存した暗号データと解除中のセッションデータを削除しました。", "已删除保存的密文和会话中的解锁数据。"],
-    "Opening Google authorization…": ["Googleの認可画面を開いています…", "正在打开Google授权页面…"],
-    "Gmail connected.": ["Gmailを接続しました。", "已连接Gmail。"],
     "Extension is unavailable.": ["拡張機能を利用できません。再読み込みしてください。", "扩展不可用，请重新加载。"],
     "Operation failed.": ["操作に失敗しました。", "操作失败。"],
     "Enter your encryption passphrase.": ["暗号化用パスフレーズを入力してください。", "请输入加密口令。"],
@@ -32,15 +28,11 @@ const ISCTLocale = (() => {
     "Invalid saved setup key.": ["保存した設定キーが無効です。", "保存的设置密钥无效。"],
     "Enter a valid university username.": ["有効な大学のユーザー名を入力してください。", "请输入有效的大学用户名。"],
     "Enter a university username and password.": ["大学のユーザー名とパスワードを入力してください。", "请输入大学用户名和密码。"],
-    "Choose an OTP method.": ["OTP方式を選択してください。", "请选择OTP方式。"],
     "Unlock the saved data before changing it.": ["変更する前に保存したデータを解除してください。", "修改前请先解锁已保存数据。"],
     "Enter your setup key.": ["設定キーを入力してください。", "请输入设置密钥。"],
     "Enter a setup key and a new encryption passphrase first.": ["設定キーと暗号化用パスフレーズを入力してください。", "请先输入设置密钥和加密口令。"],
     "Save an encrypted setup key first.": ["先に設定キーを暗号化して保存してください。", "请先加密保存设置密钥。"],
     "Unlock the saved key first.": ["先に保存したデータを解除してください。", "请先解锁已保存数据。"],
-    "Set the Google OAuth client ID in manifest.json first.": ["先にmanifest.jsonにGoogle OAuthクライアントIDを設定してください。", "请先在manifest.json中设置Google OAuth客户端ID。"],
-    "Gmail authorization is unavailable.": ["Gmailの認可を利用できません。", "Gmail授权不可用。"],
-    "Gmail authorization failed.": ["Gmailの認可に失敗しました。", "Gmail授权失败。"],
     "Enter a valid Base32 TOTP key or a SHA1, 6-digit otpauth://totp link.": ["有効なBase32設定キー、またはSHA1・6桁のotpauth://totpリンクを入力してください。", "请输入有效的Base32密钥或使用SHA1、六位代码的otpauth://totp链接。"],
     "Only otpauth://totp setup links are supported.": ["otpauth://totp形式の設定リンクに対応しています。", "仅支持otpauth://totp设置链接。"]
   };
@@ -52,8 +44,6 @@ const ISCTLocale = (() => {
     if (until) return index === 0 ? `${until[1]}まで解除中です。` : `已解锁至${until[1]}。`;
     const seconds = message.match(/^Refreshes in (\d+) seconds\.$/);
     if (seconds) return index === 0 ? `${seconds[1]}秒後に更新します。` : `${seconds[1]}秒后刷新。`;
-    const gmail = message.match(/^Gmail request failed \((\d+)\)\.$/);
-    if (gmail) return index === 0 ? `Gmailへの接続に失敗しました（${gmail[1]}）。` : `Gmail请求失败（${gmail[1]}）。`;
     return message;
   }
   return { text };

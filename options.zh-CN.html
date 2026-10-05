@@ -8,8 +8,8 @@
     body { font: 16px/1.5 system-ui, sans-serif; max-width: 720px; margin: 3rem auto; padding: 0 1rem; color: #183044; }
     h1 { font-size: 1.6rem; }
     label { display: block; margin: 1.2rem 0 .4rem; font-weight: 650; }
-    input, select, button { font: inherit; }
-    input, select { box-sizing: border-box; width: 100%; padding: .65rem; border: 1px solid #8093a1; border-radius: 5px; }
+    input, button { font: inherit; }
+    input { box-sizing: border-box; width: 100%; padding: .65rem; border: 1px solid #8093a1; border-radius: 5px; }
     button { margin: .8rem .4rem .3rem 0; padding: .6rem .9rem; border: 0; border-radius: 5px; background: #0870a8; color: white; cursor: pointer; }
     button.secondary { background: #536575; }
     section { border-top: 1px solid #d7e0e6; margin-top: 1.5rem; padding-top: .5rem; }
@@ -23,12 +23,6 @@
   <h1>Science Tokyo 自动登录设置</h1>
   <p>解锁期间填写大学用户名和密码，随后提交OTP。目标网站为 <code>isct.ex-tic.com</code>。</p>
 
-  <label for="mode">OTP方式</label>
-  <select id="mode">
-    <option value="totp">设置密钥（TOTP）</option>
-    <option value="gmail">Gmail中的OTP邮件</option>
-  </select>
-
   <section>
     <h2>大学登录</h2>
     <p>如需从第一页自动继续，请保存大学用户名和密码，它们与设置密钥一起加密。已有保存数据时请先解锁，再填写这两栏，并在下方输入和确认当前或新的加密口令后保存。</p>
@@ -41,7 +35,7 @@
 
   <section>
     <h2>设置密钥（TOTP）</h2>
-    <p>输入大学设置页面 <strong>显示密钥 / Show secret key</strong> 中显示的密钥。无需扫描二维码或注册手机应用。设置密钥不同于不断变化的六位代码，也不是Google密码。</p>
+    <p>输入大学设置页面 <strong>显示密钥 / Show secret key</strong> 中显示的密钥。无需扫描二维码或注册手机应用。设置密钥不同于不断变化的六位代码，也不是大学密码。</p>
     <label for="secret">设置密钥</label>
     <input id="secret" type="password" autocomplete="off" spellcheck="false" placeholder="留空以保留已保存的密钥">
     <label for="newPassphrase">保存用加密口令（至少6个字符）</label>
@@ -64,13 +58,6 @@
     <small id="codeExpiry"></small>
     <button id="removeSecret" class="secondary" type="button">删除已保存数据</button>
     <p>用户名、大学密码和设置密钥使用AES-256-GCM加密保存在本机，不保存加密口令或加密密钥。解锁数据保存在会话内存中，不同步或上传至其他服务器。用户名、大学密码和OTP提交至大学的HTTPS表单，设置密钥和加密口令不会提交。清除浏览缓存不会删除密文，请使用 <strong>删除已保存数据</strong>。解锁期间设备或浏览器被控制时，数据仍可能被窃取。</p>
-  </section>
-
-  <section>
-    <h2>Gmail OTP邮件</h2>
-    <p>Gmail使用只读权限。请授权接收 <code>noreply@ex-tic.com</code> 邮件的Gmail账户。</p>
-    <button id="connectGmail" type="button">连接Gmail</button>
-    <small id="gmailState"></small>
   </section>
 
   <section>

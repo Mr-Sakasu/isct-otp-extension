@@ -8,8 +8,8 @@
     body { font: 16px/1.5 system-ui, sans-serif; max-width: 720px; margin: 3rem auto; padding: 0 1rem; color: #183044; }
     h1 { font-size: 1.6rem; }
     label { display: block; margin: 1.2rem 0 .4rem; font-weight: 650; }
-    input, select, button { font: inherit; }
-    input, select { box-sizing: border-box; width: 100%; padding: .65rem; border: 1px solid #8093a1; border-radius: 5px; }
+    input, button { font: inherit; }
+    input { box-sizing: border-box; width: 100%; padding: .65rem; border: 1px solid #8093a1; border-radius: 5px; }
     button { margin: .8rem .4rem .3rem 0; padding: .6rem .9rem; border: 0; border-radius: 5px; background: #0870a8; color: white; cursor: pointer; }
     button.secondary { background: #536575; }
     section { border-top: 1px solid #d7e0e6; margin-top: 1.5rem; padding-top: .5rem; }
@@ -21,13 +21,7 @@
   <nav aria-label="Language"><a href="options.html" lang="en">English</a> · <a href="options.ja.html" lang="ja">日本語</a> · <a href="options.zh-CN.html" lang="zh-CN">简体中文</a></nav>
   <p><a href="help.html">Illustrated setup guide</a></p>
   <h1>Science Tokyo OTP settings</h1>
-  <p>While unlocked, this extension can enter your university username and password, then select your OTP method and submit its code on <code>isct.ex-tic.com</code>.</p>
-
-  <label for="mode">OTP method</label>
-  <select id="mode">
-    <option value="totp">Setup key (TOTP)</option>
-    <option value="gmail">OTP email in Gmail</option>
-  </select>
+  <p>While unlocked, this extension can enter your university username and password, then select OTP app authentication and submit the generated code on <code>isct.ex-tic.com</code>.</p>
 
   <section>
     <h2>University login</h2>
@@ -41,7 +35,7 @@
 
   <section>
     <h2>Setup key (TOTP)</h2>
-    <p>Enter the key shown by <strong>Show secret key</strong> on the university's setup page. No QR scan or phone app is required: this extension generates the codes locally. This key is different from the changing six-digit code and your Google password.</p>
+    <p>Enter the key shown by <strong>Show secret key</strong> on the university's setup page. No QR scan or phone app is required: this extension generates the codes locally. This key is different from the changing six-digit code and your university password.</p>
     <label for="secret">Setup key</label>
     <input id="secret" type="password" autocomplete="off" spellcheck="false" placeholder="Leave blank to keep the saved key">
     <label for="newPassphrase">Encryption passphrase for saving (at least 6 characters)</label>
@@ -64,13 +58,6 @@
     <small id="codeExpiry"></small>
     <button id="removeSecret" class="secondary" type="button">Remove saved data</button>
     <p>Your username, university password, and setup key are saved locally with AES-256-GCM encryption. Your encryption passphrase and encryption key are not saved. Unlocked data is held in the extension's session memory. There is no extension sync or upload to other servers. The username and university password are submitted to the university's HTTPS login form, followed by the generated OTP. The setup key and encryption passphrase are never submitted. Clearing browsing cache does not remove the encrypted data; use <strong>Remove saved data</strong>. Malware or someone controlling this browser while unlocked can still obtain the data.</p>
-  </section>
-
-  <section>
-    <h2>Gmail OTP email</h2>
-    <p>Gmail access uses the read-only Gmail scope. Authorize the Gmail account that receives messages from <code>noreply@ex-tic.com</code>.</p>
-    <button id="connectGmail" type="button">Connect Gmail</button>
-    <small id="gmailState"></small>
   </section>
 
   <section>
