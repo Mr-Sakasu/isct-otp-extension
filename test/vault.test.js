@@ -43,3 +43,22 @@ test("six-character passphrase encrypts username, university password, and OTP k
   for (const value of [data.username, data.password, data.secret, "abc123"]) assert.ok(!stored.includes(value));
   await assert.rejects(encryptVault({ ...config, password: "password without username" }, "abc123"), /username and password/);
 });
+
+test("automatic storage works without a passphrase and detects modified data or a different device key", async () => {
+  const { createDeviceKey, encryptAutomatic, decryptAutomatic } = require("../vault.js");
+  const deviceKey = createDeviceKey();
+  assert.equal(deviceKey.length, 32);
+  const data = { ...config, username: "test-science-tokyo-id", password: "test-only university password" };
+  const record = await encryptAutomatic(data, deviceKey);
+  assert.deepEqual(await decryptAutomatic(record, deviceKey), data);
+  for (const value of [data.secret, data.username, data.password]) assert.ok(!JSON.stringify(record).includes(value));
+  const second = await encryptAutomatic(data, deviceKey);
+  assert.notDeepEqual(record.iv, second.iv);
+  await assert.rejects(decryptAutomatic(record, createDeviceKey()), /could not be read/);
+  for (const field of ["iv", "ciphertext"]) {
+    const modified = structuredClone(record);
+    modified[field][0] ^= 1;
+    await assert.rejects(decryptAutomatic(modified, deviceKey), /could not be read/);
+  }
+  await assert.rejects(decryptAutomatic({ ...record, version: 1 }, deviceKey), /Invalid encrypted/);
+});
