@@ -1,15 +1,14 @@
 {
   "manifest_version": 3,
   "name": "Science Tokyo OTP Autofill",
-  "version": "0.5.1",
-  "description": "Automatically enter your encrypted Science Tokyo username, password, and OTP while unlocked.",
+  "version": "0.6.0",
+  "description": "Automatically enter your Science Tokyo username, password, and OTP after a one-time setup.",
   "minimum_chrome_version": "105",
   "action": {
     "default_title": "Science Tokyo OTP settings"
   },
   "permissions": [
-    "storage",
-    "alarms"
+    "storage"
   ],
   "background": {
     "service_worker": "service_worker.js"

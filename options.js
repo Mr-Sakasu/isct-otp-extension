@@ -1,12 +1,11 @@
 const secretInput = document.getElementById("secret");
 const statusText = document.getElementById("status");
-const showCodeButton = document.getElementById("showCode");
 const revealedKey = document.getElementById("revealedKey");
-const hideKeyButton = document.getElementById("hideKey");
+const showKeyButton = document.getElementById("showKey");
 let codeTimer = null;
-let keyTimer = null;
-let codeDisplayVersion = 0;
-let keyDisplayVersion = 0;
+let codeVersion = 0;
+let keyVersion = 0;
+let busy = false;
 
 function status(message) {
   statusText.textContent = ISCTLocale.text(message);
@@ -18,60 +17,51 @@ async function request(message) {
   return result;
 }
 
-function hideCode() {
-  codeDisplayVersion++;
+function hideKey() {
+  keyVersion++;
+  revealedKey.value = "";
+  revealedKey.hidden = true;
+  showKeyButton.textContent = ISCTLocale.text("Show saved key");
+}
+
+function stopCode() {
+  codeVersion++;
   clearInterval(codeTimer);
   codeTimer = null;
   document.getElementById("currentCode").textContent = "";
   document.getElementById("codeExpiry").textContent = "";
-  showCodeButton.textContent = ISCTLocale.text("Show current code");
 }
 
-function hideKey() {
-  keyDisplayVersion++;
-  clearTimeout(keyTimer);
-  keyTimer = null;
-  revealedKey.value = "";
-  revealedKey.hidden = true;
-  hideKeyButton.hidden = true;
-}
-
-function clearPassphrases() {
-  for (const id of ["newPassphrase", "confirmPassphrase", "unlockPassphrase"]) document.getElementById(id).value = "";
+async function updateCode(version) {
+  const result = await request({ type: "GET_LOCAL_CODE" });
+  if (version !== codeVersion || document.hidden) return;
+  document.getElementById("currentCode").textContent = result.code;
+  document.getElementById("codeExpiry").textContent = ISCTLocale.text(`Refreshes in ${result.remainingSeconds} seconds.`);
 }
 
 async function refresh() {
-  const settings = await request({ type: "VAULT_STATUS" });
-  const state = document.getElementById("secretState");
-  if (settings.legacy) {
-    state.textContent = "An older unencrypted key remains. Set and confirm a new passphrase, then Save settings to encrypt it. Leave Setup key blank to keep that key.";
-  } else if (!settings.encrypted) state.textContent = "No setup key saved.";
-  else if (!settings.unlocked) state.textContent = "Encrypted setup key saved. Locked.";
-  else state.textContent = `Encrypted key unlocked until ${new Date(settings.expiresAt).toLocaleTimeString()}.`;
-  state.textContent = ISCTLocale.text(state.textContent);
-  document.getElementById("unlock").disabled = !settings.encrypted;
-  document.getElementById("lock").disabled = !settings.unlocked;
-  document.getElementById("showKey").disabled = !settings.encrypted;
-  showCodeButton.disabled = !settings.unlocked;
-  document.getElementById("loginState").textContent = !settings.unlocked ? "Unlock saved data to check the login settings." :
-    settings.passwordSaved ? "Username and university password saved for automatic login." :
-    settings.usernameSaved ? "Username saved. University password is not saved yet." : "No university login credentials saved.";
-  document.getElementById("loginState").textContent = ISCTLocale.text(document.getElementById("loginState").textContent);
-  if (!settings.unlocked) hideCode();
+  const settings = await request({ type: "GET_SETTINGS" });
+  document.getElementById("migration").hidden = !settings.needsMigration;
+  document.getElementById("secretState").textContent = ISCTLocale.text(settings.ready ? "Saved. Automatic entry is ready." : "Enter your setup key and save.");
+  if (!document.getElementById("username").value) document.getElementById("username").value = settings.username;
+  showKeyButton.disabled = !settings.ready;
+  document.getElementById("codeSection").hidden = !settings.ready;
+  if (!settings.ready || document.hidden) stopCode();
+  else if (codeTimer === null) {
+    const version = ++codeVersion;
+    codeTimer = setInterval(() => updateCode(version).catch(() => stopCode()), 1000);
+    await updateCode(version);
+  }
 }
 
-// Serialize UI operations to prevent double clicks during key derivation.
-let busy = false;
 async function act(operation) {
   if (busy) return;
   busy = true;
   const buttons = [...document.querySelectorAll("button")];
   for (const button of buttons) button.disabled = true;
-  try {
-    await operation();
-  } catch (error) {
-    status(error.message || "Operation failed.");
-  } finally {
+  try { await operation(); }
+  catch (error) { status(error.message || "Operation failed."); }
+  finally {
     busy = false;
     for (const button of buttons) button.disabled = false;
     await refresh().catch((error) => status(error.message));
@@ -79,115 +69,65 @@ async function act(operation) {
 }
 
 document.getElementById("save").addEventListener("click", () => act(async () => {
-  hideCode();
   hideKey();
-  const passphrase = document.getElementById("newPassphrase").value;
-  const confirmation = document.getElementById("confirmPassphrase").value;
-  if (passphrase !== confirmation) throw new Error("The new passphrases do not match.");
-  const message = { type: "SAVE_SETTINGS", secret: secretInput.value.trim(), passphrase,
+  stopCode();
+  const message = { type: "SAVE_SETTINGS", secret: secretInput.value.trim(),
     username: document.getElementById("username").value.trim(), password: document.getElementById("universityPassword").value };
-  clearPassphrases();
-  status("Saving settings…");
+  status("Saving…");
   await request(message);
   secretInput.value = "";
-  document.getElementById("username").value = "";
   document.getElementById("universityPassword").value = "";
-  status("Settings saved. The setup key is encrypted when present.");
+  status("Saved. Open the university login page.");
 }));
 
-document.getElementById("unlock").addEventListener("click", () => act(async () => {
-  const passphrase = document.getElementById("unlockPassphrase").value;
-  clearPassphrases();
-  status("Unlocking…");
-  await request({ type: "UNLOCK_VAULT", passphrase });
-  status("Unlocked for 30 minutes. Open or reload the university's login page to start automatic entry.");
+document.getElementById("migrate").addEventListener("click", () => act(async () => {
+  const passphrase = document.getElementById("legacyPassphrase").value;
+  document.getElementById("legacyPassphrase").value = "";
+  status("Importing…");
+  await request({ type: "MIGRATE_LEGACY", passphrase });
+  status("Imported. Automatic entry is ready.");
 }));
 
-document.getElementById("lock").addEventListener("click", () => act(async () => {
-  hideCode();
-  hideKey();
-  clearPassphrases();
-  secretInput.value = "";
-  document.getElementById("username").value = "";
-  document.getElementById("universityPassword").value = "";
-  await request({ type: "LOCK_VAULT" });
-  status("Locked. Unlocked session key removed.");
-}));
-
-document.getElementById("showKey").addEventListener("click", () => act(async () => {
-  hideKey();
-  const version = keyDisplayVersion;
-  const passphrase = document.getElementById("unlockPassphrase").value;
-  clearPassphrases();
-  status("Verifying passphrase…");
-  const result = await request({ type: "REVEAL_KEY", passphrase });
-  if (version !== keyDisplayVersion || document.hidden) return;
+showKeyButton.addEventListener("click", () => act(async () => {
+  if (!revealedKey.hidden) return hideKey();
+  const version = ++keyVersion;
+  const result = await request({ type: "REVEAL_KEY" });
+  if (version !== keyVersion || document.hidden) return;
   revealedKey.value = result.secret;
   revealedKey.hidden = false;
-  hideKeyButton.hidden = false;
-  keyTimer = setTimeout(hideKey, 30000);
-  status("Saved key shown for 30 seconds. Hide it when finished.");
+  showKeyButton.textContent = ISCTLocale.text("Hide saved key");
 }));
-
-hideKeyButton.addEventListener("click", hideKey);
-
-async function updateCode(version) {
-  const result = await request({ type: "GET_LOCAL_CODE" });
-  if (version !== codeDisplayVersion || document.hidden) return;
-  document.getElementById("currentCode").textContent = result.code;
-  document.getElementById("codeExpiry").textContent = ISCTLocale.text(`Refreshes in ${result.remainingSeconds} seconds.`);
-}
-
-showCodeButton.addEventListener("click", () => {
-  if (codeTimer !== null) return hideCode();
-  const version = ++codeDisplayVersion;
-  showCodeButton.textContent = ISCTLocale.text("Hide code");
-  codeTimer = setInterval(() => updateCode(version).catch((error) => {
-    hideCode();
-    status(error.message);
-    refresh().catch(() => {});
-  }), 1000);
-  updateCode(version).catch((error) => {
-    hideCode();
-    status(error.message);
-  });
-});
 
 document.getElementById("removeSecret").addEventListener("click", () => act(async () => {
-  hideCode();
   hideKey();
-  clearPassphrases();
-  secretInput.value = "";
+  stopCode();
   await request({ type: "DELETE_KEY" });
+  secretInput.value = "";
   document.getElementById("username").value = "";
   document.getElementById("universityPassword").value = "";
-  status("Saved encrypted data and unlocked session data removed.");
+  status("Saved data removed.");
 }));
 
-window.addEventListener("pagehide", () => {
-  hideCode();
+function clearSensitiveFields() {
   hideKey();
-  clearPassphrases();
+  stopCode();
   secretInput.value = "";
-  document.getElementById("username").value = "";
   document.getElementById("universityPassword").value = "";
-});
+  document.getElementById("legacyPassphrase").value = "";
+}
+window.addEventListener("pagehide", clearSensitiveFields);
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden) {
-    hideCode();
-    hideKey();
-    clearPassphrases();
-  }
+  if (document.hidden) clearSensitiveFields();
+  else refresh().catch((error) => status(error.message));
+});
+document.getElementById("savedData").addEventListener("toggle", () => {
+  if (!document.getElementById("savedData").open) hideKey();
 });
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === "session" && changes.unlockedVault) {
+  if (area === "local" && (changes.automaticSettings || changes.vault || changes.totp)) {
     hideKey();
-    refresh().catch((error) => status(error.message));
-  } else if (area === "local" && (changes.vault || changes.totp)) {
-    hideKey();
-    hideCode();
+    stopCode();
     refresh().catch((error) => status(error.message));
   }
 });
-
 refresh().catch((error) => status(error.message));

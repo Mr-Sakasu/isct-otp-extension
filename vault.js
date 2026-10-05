@@ -76,7 +76,48 @@
     return validateConfig(JSON.parse(new TextDecoder().decode(plaintext)));
   }
 
-  const api = { encryptVault, decryptVault, validateConfig };
+  // Automatic storage uses a random key kept in the same local Chrome profile.
+  // This avoids plaintext records; it does not protect a stolen complete profile.
+  const automaticAad = new TextEncoder().encode("Science Tokyo OTP automatic settings v2");
+
+  function createDeviceKey() {
+    return [...crypto.getRandomValues(new Uint8Array(32))];
+  }
+
+  async function deviceCryptoKey(deviceKey) {
+    return crypto.subtle.importKey("raw", bytes(deviceKey, 32), { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+  }
+
+  async function encryptAutomatic(config, deviceKey) {
+    const normalized = validateConfig(config);
+    const key = await deviceCryptoKey(deviceKey);
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ciphertext = await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv, additionalData: automaticAad, tagLength: 128 }, key,
+      new TextEncoder().encode(JSON.stringify(normalized))
+    );
+    return { version: 2, algorithm: "AES-256-GCM", iv: [...iv], ciphertext: [...new Uint8Array(ciphertext)] };
+  }
+
+  async function decryptAutomatic(record, deviceKey) {
+    if (!record || record.version !== 2 || record.algorithm !== "AES-256-GCM" ||
+        !Array.isArray(record.ciphertext) || record.ciphertext.length < 17 || record.ciphertext.length > 16384) {
+      throw new Error("Invalid encrypted key data.");
+    }
+    const key = await deviceCryptoKey(deviceKey);
+    const iv = bytes(record.iv, 12);
+    const ciphertext = bytes(record.ciphertext);
+    try {
+      const plaintext = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv, additionalData: automaticAad, tagLength: 128 }, key, ciphertext
+      );
+      return validateConfig(JSON.parse(new TextDecoder().decode(plaintext)));
+    } catch {
+      throw new Error("Saved settings could not be read. Enter your setup key again.");
+    }
+  }
+
+  const api = { encryptVault, decryptVault, validateConfig, createDeviceKey, encryptAutomatic, decryptAutomatic };
   root.ISCTVault = api;
   if (typeof module !== "undefined") module.exports = api;
 })(globalThis);

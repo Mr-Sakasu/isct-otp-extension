@@ -1,150 +1,23 @@
 <!doctype html>
-<html lang="ja">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Science Tokyo 自動ログインの設定</title>
-  <style>
-    body { font: 16px/1.7 system-ui, sans-serif; max-width: 720px; margin: 3rem auto; padding: 0 1rem; color: #183044; }
-    h1 { font-size: 1.6rem; }
-    h2 { font-size: 1.25rem; }
-    label { display: block; margin: 1.2rem 0 .4rem; font-weight: 650; }
-    input, button { font: inherit; }
-    input { box-sizing: border-box; width: 100%; padding: .65rem; border: 1px solid #8093a1; border-radius: 5px; }
-    button { margin: .8rem .4rem .3rem 0; padding: .6rem .9rem; border: 0; border-radius: 5px; background: #0870a8; color: white; cursor: pointer; }
-    button.secondary { background: #536575; }
-    section { border-top: 1px solid #d7e0e6; margin-top: 1.5rem; padding-top: .5rem; }
-    small { display: block; color: #485e6d; }
-    ol, ul { padding-left: 1.5rem; }
-    li { margin: .3rem 0; }
-    dt { font-weight: 650; margin-top: .6rem; }
-    dd { margin: 0 0 0 1rem; }
-    #status { min-height: 1.5rem; font-weight: 650; }
-  </style>
-</head>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Science Tokyo Autofill</title><style>body{font:16px/1.6 system-ui,sans-serif;max-width:620px;margin:2rem auto;padding:0 1rem;color:#183044}h1{font-size:1.5rem}label{display:block;margin:1rem 0 .3rem;font-weight:600}input{box-sizing:border-box;width:100%;font:inherit;padding:.6rem;border:1px solid #8093a1;border-radius:5px}button{font:inherit;margin:.8rem .4rem 0 0;padding:.5rem .9rem;border:0;border-radius:5px;background:#0870a8;color:white;cursor:pointer}.secondary{background:#536575}small{display:block;color:#485e6d}details,section{margin-top:1.3rem}summary{cursor:pointer}#currentCode{font-size:1.8rem;font-variant-numeric:tabular-nums;letter-spacing:.15em}#status{min-height:1.5rem}#migration{background:#eef6ff;padding:1rem;border-radius:6px}[hidden]{display:none!important}</style></head>
 <body>
-  <nav aria-label="表示言語"><a href="options.html" lang="en">English</a> · <a href="options.ja.html" lang="ja">日本語</a> · <a href="options.zh-CN.html" lang="zh-CN">简体中文</a></nav>
-  <p><a href="help.ja.html">画像付きの設定ガイド</a></p>
-  <h1>Science Tokyo 自動ログインの設定</h1>
-  <p>この拡張機能は、Science Tokyo のログイン画面（<code>isct.ex-tic.com</code>）で、大学のユーザー名、パスワード、OTP（6桁のワンタイムコード）を順番に自動入力して送信します。自動入力が動くのは、この画面でロックを解除している間だけです。</p>
-
-  <h2>この画面で使う言葉</h2>
-  <dl>
-    <dt>大学のログインパスワード</dt>
-    <dd>Science Tokyo ID で大学のシステムにログインするときのパスワードです。</dd>
-    <dt>設定キー</dt>
-    <dd>大学の OTP 設定画面で「シークレットキー（Show secret key）」として表示される文字列です。この拡張機能は、このキーから6桁のコードを作ります。ログインのたびに変わる6桁のコードとは別のものです。スマートフォンの認証アプリからコードを読み取ることはできません。</dd>
-    <dt>暗号化用パスフレーズ</dt>
-    <dd>この拡張機能に保存するデータを暗号化するために、自分で決める合言葉（この拡張機能専用のパスワード）です。大学のログインパスワードとは別のものにしてください。</dd>
-    <dt>ロックとロック解除</dt>
-    <dd>保存したデータは、普段は暗号化されたまま（ロック中）です。暗号化用パスフレーズを入力してロックを解除すると、30分間だけ自動入力が使えます。</dd>
-  </dl>
-
-  <h2>初めて設定するときの手順</h2>
-  <ol>
-    <li>大学の OTP 設定画面で「シークレットキーを表示する / Show secret key」を押し、表示された文字列をコピーします。</li>
-    <li>下の「設定キー」欄に貼り付けます。</li>
-    <li>ユーザー名とパスワードも自動入力したい場合は、「大学のユーザー名」と「大学のログインパスワード」を入力します（任意）。</li>
-    <li>暗号化用パスフレーズを決めて2回入力し、ページ最下部の「設定を保存」を押します。</li>
-    <li>大学の画面で6桁のコードを求められたら、「現在のコードを表示」を押し、表示されたコードを大学の「トークン」欄に入力します。</li>
-  </ol>
-  <p>2回目からは、Chrome を起動したあとに「30分間ロックを解除」を押してから、大学のログイン画面を開きます。</p>
-
-  <section>
-    <h2>大学のログイン情報（任意）</h2>
-    <p>大学のユーザー名とログインパスワードを保存すると、ログイン画面の最初の入力から自動で進みます。保存しない場合は、ユーザー名とパスワードを自分で入力してください。OTP の画面は自動で入力します。</p>
-    <p>ここに入力した内容は、設定キーと一緒に暗号化して保存します。</p>
-    <p>設定キーをすでに保存している場合は、次の順に操作します。</p>
-    <ol>
-      <li>下の「ロックの解除と設定キーの確認」で、先にロックを解除します。</li>
-      <li>ユーザー名とパスワードを入力します。「設定キー」欄は空欄のままにします。</li>
-      <li>暗号化用パスフレーズ（今のものか、新しいもの）を2回入力し、「設定を保存」を押します。</li>
-    </ol>
-    <label for="username">大学のユーザー名（Science Tokyo ID）</label>
-    <input id="username" type="text" autocomplete="off" spellcheck="false" maxlength="256" placeholder="ロック解除中に空欄で保存すると、保存済みの値を維持">
-    <label for="universityPassword">大学のログインパスワード</label>
-    <input id="universityPassword" type="password" autocomplete="off" spellcheck="false" maxlength="1024" placeholder="ロック解除中に空欄で保存すると、保存済みの値を維持">
-    <small id="loginState"></small>
-  </section>
-
-  <section>
-    <h2>設定キー</h2>
-    <p>大学の OTP 設定画面で「シークレットキーを表示する / Show secret key」を押すと表示される文字列を、そのまま貼り付けます。QR コードの読み取りや、スマートフォンの認証アプリへの登録は必要ありません。<code>otpauth://totp</code> で始まるリンクも使えます。</p>
-    <p>設定キーは、最初に一度保存すれば十分です。ロックを解除するたびに新しく発行する必要はありません。</p>
-    <p>すでにアプリ認証を登録済みで、シークレットキーをもう表示できない場合は、<a href="help.ja.html">画像付きの設定ガイド</a>の「すでにアプリ認証を登録済みの場合」を見てください。</p>
-    <label for="secret">設定キー</label>
-    <input id="secret" type="password" autocomplete="off" spellcheck="false" placeholder="ロック解除中に空欄で保存すると、保存済みの値を維持">
-    <p>注意：ロック中に新しい設定キーを入力して保存すると、保存済みのユーザー名とパスワードは引き継がれません。引き継ぎたい場合は、先にロックを解除してください。</p>
-  </section>
-
-  <section>
-    <h2>暗号化用パスフレーズ</h2>
-    <p>この拡張機能に保存するデータを暗号化するために、自分で決める合言葉です。大学のログインパスワードとは別のものにしてください。</p>
-    <label for="newPassphrase">暗号化用パスフレーズ（6文字以上）</label>
-    <input id="newPassphrase" type="password" autocomplete="off" spellcheck="false" placeholder="保存のたびに入力（今のものか、新しいもの）">
-    <label for="confirmPassphrase">暗号化用パスフレーズ（確認のためもう一度）</label>
-    <input id="confirmPassphrase" type="password" autocomplete="off" spellcheck="false" placeholder="同じものをもう一度入力">
-    <ul>
-      <li>6文字は最低限の条件で、6文字あれば安全という意味ではありません。長いものほど推測されにくくなります。</li>
-      <li>保存するたびに、今の暗号化用パスフレーズか新しいものを2回入力します。新しいものを入力すると、暗号化用パスフレーズが変わります。変更するときは、先にロックを解除し、「設定キー」欄を空欄のまま保存します。</li>
-      <li>暗号化用パスフレーズはどこにも保存しないため、忘れると復元できません。その場合は、設定キーとログイン情報を入力し直して、新しい暗号化用パスフレーズで保存してください。元の設定キーが手元にない場合は、大学側で設定キーを登録し直す必要があります。</li>
-      <li>入力が終わったら、ページ最下部の「設定を保存」を押します。</li>
-    </ul>
-  </section>
-
-  <section>
-    <h2>ロックの解除と設定キーの確認</h2>
-    <small id="secretState" role="status"></small>
-    <label for="unlockPassphrase">暗号化用パスフレーズ（ロック解除・設定キーの表示に使用）</label>
-    <input id="unlockPassphrase" type="password" autocomplete="off" spellcheck="false" placeholder="保存するときに決めた暗号化用パスフレーズ">
-    <button id="unlock" type="button">30分間ロックを解除</button>
-    <button id="lock" class="secondary" type="button">今すぐロック</button>
-    <button id="showKey" class="secondary" type="button">保存した設定キーを30秒間表示</button>
-    <input id="revealedKey" type="text" readonly hidden aria-label="保存した設定キー" autocomplete="off" spellcheck="false">
-    <button id="hideKey" class="secondary" type="button" hidden>設定キーを隠す</button>
-    <p>Chrome を起動したら、暗号化用パスフレーズを入力して「30分間ロックを解除」を押します。そのあと <code>https://isct.ex-tic.com/auth/session</code> を開くか再読み込みすると、自動入力が始まります。</p>
-    <p>次のときは自動でロックされます。すぐにロックしたいときは「今すぐロック」を押します。</p>
-    <ul>
-      <li>ロックを解除してから30分たったとき</li>
-      <li>Chrome を再起動したとき</li>
-      <li>拡張機能を再読み込みしたとき、または無効にしたとき</li>
-    </ul>
-    <p>保存した設定キーを確認するときは、暗号化用パスフレーズを入力して「保存した設定キーを30秒間表示」を押します。30秒たつか、このタブから離れると自動で隠れます。</p>
-  </section>
-
-  <section>
-    <h2>大学側の初回登録（コードを求められた場合）</h2>
-    <p>大学の OTP 設定画面で新しく登録するときは、登録を完了するために6桁のコードの入力を求められます。その場合は次の順に操作します。</p>
-    <ol>
-      <li>先に設定キーを保存します。保存したあと30分間は、ロックが解除された状態です。</li>
-      <li>「現在のコードを表示」を押します。</li>
-      <li>表示された6桁のコードを大学の画面の「トークン」欄に入力し、「設定 / Settings」を押します。</li>
-    </ol>
-    <p>コードは一定時間（通常は30秒）ごとに変わります。残り時間が少ないときは、次のコードに変わってから入力してください。</p>
-    <button id="showCode" class="secondary" type="button">現在のコードを表示</button>
-    <output id="currentCode" aria-label="現在の6桁のコード"></output>
-    <small id="codeExpiry"></small>
-  </section>
-
-  <section>
-    <h2>保存したデータの取り扱いと削除</h2>
-    <p>この拡張機能に保存したデータ（大学のユーザー名、大学のログインパスワード、設定キー）をすべて消すときは、次のボタンを押します。</p>
-    <button id="removeSecret" class="secondary" type="button">保存したデータを削除</button>
-    <ul>
-      <li>保存したデータは AES-256-GCM で暗号化し、このパソコンの Chrome の中に保存します。暗号化用パスフレーズと、そこから作る暗号鍵は保存しません。</li>
-      <li>ロックを解除している間は、復号したデータをメモリ上にだけ置きます。</li>
-      <li>他の端末との同期や、外部のサーバーへのアップロードはしません。大学の HTTPS のフォームへ送るのは、ユーザー名、大学のログインパスワード、生成した6桁のコードだけです。設定キーと暗号化用パスフレーズは送信しません。</li>
-      <li>ブラウザの閲覧履歴やキャッシュを削除しても、保存したデータは消えません。消すときは「保存したデータを削除」を押すか、拡張機能をアンインストールしてください。</li>
-      <li>ロックを解除している間にパソコンやブラウザを乗っ取られた場合や、マルウェア・キーロガーが入っている場合は、情報を盗まれるおそれがあります。</li>
-    </ul>
-  </section>
-
-  <section>
-    <p>入力した内容を暗号化して保存します。</p>
-    <button id="save" type="button">設定を保存</button>
-    <p id="status" role="status" aria-live="polite"></p>
-  </section>
-  <script src="options-i18n.js"></script>
-  <script src="options.js"></script>
-</body>
-</html>
+<nav aria-label="言語"><a href="options.html" lang="en">English</a> · <a href="options.ja.html" lang="ja">日本語</a> · <a href="options.zh-CN.html" lang="zh-CN">简体中文</a></nav>
+<h1>Science Tokyo Autofill</h1>
+<p>保存すると、大学のログイン画面で自動入力します。</p>
+<section id="migration" hidden><p>旧版の設定は、以前のパスフレーズを一度入力すると引き継げます。</p><label for="legacyPassphrase">以前のパスフレーズ</label><input id="legacyPassphrase" type="password" autocomplete="off"><button id="migrate" type="button">引き継ぐ</button></section>
+<label for="secret">設定キー</label>
+<input id="secret" type="password" autocomplete="off" spellcheck="false" placeholder="Show secret key の文字列を貼り付け">
+<small>空欄で保存すると、保存済みのキーをそのまま使います。</small>
+<label for="username">大学のユーザー名（任意）</label>
+<input id="username" type="text" autocomplete="off" spellcheck="false" maxlength="256">
+<label for="universityPassword">大学のログインパスワード（任意）</label>
+<input id="universityPassword" type="password" autocomplete="off" spellcheck="false" maxlength="1024" placeholder="空欄なら保存済みのまま">
+<button id="save" type="button">保存</button>
+<p id="status" role="status" aria-live="polite"></p>
+<small id="secretState" role="status"></small>
+<section id="codeSection" hidden><label for="currentCode">現在のコード</label><output id="currentCode"></output><small id="codeExpiry"></small><small>大学の登録画面でコードを求められたら、この6桁を入力します。</small></section>
+<p><a href="help.ja.html">設定ガイド</a></p>
+<small>データはこのChromeプロファイル内に保存されます。自分専用のパソコンで使ってください。</small>
+<details id="savedData"><summary>保存データの確認・削除</summary><button id="showKey" class="secondary" type="button">保存したキーを表示</button><input id="revealedKey" type="text" readonly hidden aria-label="保存した設定キー" autocomplete="off" spellcheck="false"><button id="removeSecret" class="secondary" type="button">保存データを削除</button></details>
+<script src="options-i18n.js"></script><script src="options.js"></script>
+</body></html>

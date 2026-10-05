@@ -2,69 +2,40 @@ importScripts("core.js", "vault.js");
 
 const SITE_URL = /^https:\/\/isct\.ex-tic\.com\/auth\/session\/second_factor(?:[/?#]|$)/;
 const LOGIN_URL = /^https:\/\/isct\.ex-tic\.com\/auth\/session\/?(?:[?#]|$)/;
+let settingsQueue = Promise.resolve();
 
-// Never expose encrypted storage or unlocked session secrets to content scripts.
+function withSettings(operation) {
+  const next = settingsQueue.then(operation);
+  settingsQueue = next.catch(() => {});
+  return next;
+}
+
+async function loadConfig() {
+  const { automaticSettings, deviceKey } = await chrome.storage.local.get(["automaticSettings", "deviceKey"]);
+  return automaticSettings ? ISCTVault.decryptAutomatic(automaticSettings, deviceKey) : null;
+}
+
+async function saveConfig(config) {
+  const settings = await chrome.storage.local.get("deviceKey");
+  const deviceKey = Array.isArray(settings.deviceKey) && settings.deviceKey.length === 32 && settings.deviceKey.every((byte) => Number.isInteger(byte) && byte >= 0 && byte <= 255)
+    ? settings.deviceKey : ISCTVault.createDeviceKey();
+  const automaticSettings = await ISCTVault.encryptAutomatic(config, deviceKey);
+  await chrome.storage.local.set({ automaticSettings, deviceKey });
+  // Remove the old record only after the replacement has been saved successfully.
+  await chrome.storage.local.remove(["vault", "totp", "mode", "gmailConnected"]);
+}
+
 const storageReady = Promise.all([
   chrome.storage.local.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" }),
   chrome.storage.session.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" })
 ]).then(async () => {
-  // Discard obsolete email-mode metadata when upgrading; keep encrypted login data.
   await chrome.storage.local.remove(["mode", "gmailConnected"]);
-  await chrome.storage.session.remove("usedMessageIds");
-});
-const LOCK_ALARM = "otp-vault-auto-lock";
-const UNLOCK_MS = 30 * 60 * 1000;
-let vaultQueue = Promise.resolve();
-
-function withVault(operation) {
-  const next = vaultQueue.then(operation);
-  vaultQueue = next.catch(() => {});
-  return next;
-}
-
-async function lockVault() {
-  await chrome.storage.session.remove("unlockedVault");
-  await chrome.alarms.clear(LOCK_ALARM);
-}
-
-function vaultTag(vault) {
-  // Chrome's storage serialization may reorder object properties.
-  return JSON.stringify([vault.version, vault.algorithm, vault.kdf, vault.iterations, vault.salt, vault.iv, vault.ciphertext]);
-}
-
-async function unlockForSession(vault, totp) {
-  const expiresAt = Date.now() + UNLOCK_MS;
-  await chrome.storage.session.set({ unlockedVault: { vaultTag: vaultTag(vault), totp, expiresAt } });
-  await chrome.alarms.create(LOCK_ALARM, { when: expiresAt });
-}
-
-async function getUnlocked(vault) {
-  const { unlockedVault } = await chrome.storage.session.get("unlockedVault");
-  if (!vault || !unlockedVault || unlockedVault.vaultTag !== vaultTag(vault) || unlockedVault.expiresAt <= Date.now()) {
-    if (unlockedVault) await lockVault();
-    return null;
-  }
-  return unlockedVault;
-}
-
-chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name !== LOCK_ALARM) return;
-  withVault(async () => {
-    await storageReady;
-    const { unlockedVault } = await chrome.storage.session.get("unlockedVault");
-    if (unlockedVault && unlockedVault.expiresAt <= Date.now()) await lockVault();
-  }).catch(() => {});
+  await chrome.storage.session.remove(["unlockedVault", "usedMessageIds"]);
+  const { automaticSettings, vault, totp } = await chrome.storage.local.get(["automaticSettings", "vault", "totp"]);
+  if (!automaticSettings && !vault && totp) await saveConfig(ISCTVault.validateConfig(totp));
 });
 
 chrome.action.onClicked.addListener(() => chrome.runtime.openOptionsPage());
-
-function isSiteTab(sender) {
-  return sender.id === chrome.runtime.id && !!sender.tab && SITE_URL.test(sender.url || "");
-}
-
-function isLoginTab(sender) {
-  return sender.id === chrome.runtime.id && !!sender.tab && LOGIN_URL.test(sender.url || "");
-}
 
 function isOptions(sender) {
   return sender.id === chrome.runtime.id && ["options.html", "options.ja.html", "options.zh-CN.html"].some((page) => sender.url === chrome.runtime.getURL(page));
@@ -72,81 +43,68 @@ function isOptions(sender) {
 
 async function handleMessage(request, sender) {
   await storageReady;
-  if (isOptions(sender)) return withVault(() => handleOptions(request));
-  if (isLoginTab(sender)) return withVault(async () => {
-    if (request?.type !== "GET_LOGIN_VALUE" || !["username", "password"].includes(request.field)) return { error: "Request denied." };
-    const { vault } = await chrome.storage.local.get("vault");
-    const unlocked = await getUnlocked(vault);
-    return unlocked ? { value: unlocked.totp[request.field] || "", ...(request.field === "password" ? { account: unlocked.totp.username || "" } : {}) } : { value: "" };
+  return withSettings(async () => {
+    if (isOptions(sender)) return handleOptions(request);
+    if (sender.id !== chrome.runtime.id || !sender.tab) return { error: "Request denied." };
+    if (LOGIN_URL.test(sender.url || "")) {
+      if (request?.type !== "GET_LOGIN_VALUE" || !["username", "password"].includes(request.field)) return { error: "Request denied." };
+      const config = await loadConfig();
+      return { value: config?.[request.field] || "", ...(request.field === "password" ? { account: config?.username || "" } : {}) };
+    }
+    if (!SITE_URL.test(sender.url || "")) return { error: "Request denied." };
+    if (request?.type !== "GET_STATUS" && request?.type !== "GET_CODE") return { error: "Request denied." };
+    const config = await loadConfig();
+    if (request.type === "GET_STATUS") return { ready: !!config };
+    if (!config) return { error: "Save your setup key in extension settings first." };
+    const result = await ISCTOTP.generateTotp(config);
+    return result.remainingSeconds < 6 ? { pending: true } : { code: result.code };
   });
-  if (!isSiteTab(sender)) return { error: "Request denied." };
-  return withVault(() => handleSiteMessage(request));
-}
-
-async function handleSiteMessage(request) {
-  const { vault } = await chrome.storage.local.get("vault");
-  const unlocked = await getUnlocked(vault);
-  if (request?.type === "GET_STATUS") return { ready: !!unlocked };
-  if (request?.type !== "GET_CODE") return { error: "Unknown request." };
-  if (!unlocked) return { error: "Unlock your encrypted setup key in the extension options first." };
-  const result = await ISCTOTP.generateTotp(unlocked.totp);
-  return result.remainingSeconds < 6 ? { pending: true } : { code: result.code };
 }
 
 async function handleOptions(request) {
-  const settings = await chrome.storage.local.get(["vault", "totp"]);
-  if (request?.type === "VAULT_STATUS") {
-    const unlocked = await getUnlocked(settings.vault);
-    return { encrypted: !!settings.vault, legacy: !!settings.totp,
-      unlocked: !!unlocked, expiresAt: unlocked?.expiresAt || 0,
-      usernameSaved: !!unlocked?.totp.username, passwordSaved: !!unlocked?.totp.password };
+  if (request?.type === "DELETE_KEY") {
+    await chrome.storage.local.remove(["automaticSettings", "deviceKey", "vault", "totp"]);
+    await chrome.storage.session.remove("unlockedVault");
+    return { removed: true };
+  }
+  let config;
+  try { config = await loadConfig(); }
+  catch (error) {
+    if (request?.type !== "GET_SETTINGS" && !(request?.type === "SAVE_SETTINGS" && request.secret)) throw error;
+    config = null;
+  }
+  if (request?.type === "GET_SETTINGS") {
+    const { vault } = await chrome.storage.local.get("vault");
+    return { ready: !!config, needsMigration: !config && !!vault, username: config?.username || "", passwordSaved: !!config?.password };
   }
   if (request?.type === "SAVE_SETTINGS") {
-    let totp;
-    const unlocked = await getUnlocked(settings.vault);
-    if (request.secret) totp = { ...(unlocked?.totp || {}), ...ISCTOTP.parseTotpSecret(request.secret) };
-    else if (settings.vault) {
-      if (!unlocked) throw new Error("Unlock the saved data before changing it.");
-      totp = { ...unlocked.totp };
-    } else if (settings.totp) totp = ISCTVault.validateConfig(settings.totp);
-    else throw new Error("Enter your setup key.");
-    if (request.username) totp.username = request.username;
-    if (request.password) totp.password = request.password;
-    const vault = await ISCTVault.encryptVault(totp, request.passphrase);
-    await chrome.storage.local.set({ vault });
-    await chrome.storage.local.remove("totp");
-    await unlockForSession(vault, totp);
+    let next = config ? { ...config } : {};
+    if (request.secret) next = { ...next, ...ISCTOTP.parseTotpSecret(request.secret) };
+    if (!next.secret) throw new Error("Enter your setup key.");
+    if (request.username) next.username = request.username;
+    if (request.password) next.password = request.password;
+    await saveConfig(next);
     return { saved: true };
   }
-  if (request?.type === "UNLOCK_VAULT") {
-    if (!settings.vault) throw new Error("Save an encrypted setup key first.");
-    const totp = await ISCTVault.decryptVault(settings.vault, request.passphrase);
-    await unlockForSession(settings.vault, totp);
-    return { unlocked: true };
-  }
-  if (request?.type === "LOCK_VAULT") {
-    await lockVault();
-    return { locked: true };
+  if (request?.type === "MIGRATE_LEGACY") {
+    const { vault } = await chrome.storage.local.get("vault");
+    if (!vault) throw new Error("No previous settings to import.");
+    const previous = await ISCTVault.decryptVault(vault, request.passphrase);
+    await saveConfig(previous);
+    return { imported: true };
   }
   if (request?.type === "REVEAL_KEY") {
-    if (!settings.vault) throw new Error("Save an encrypted setup key first.");
-    const totp = await ISCTVault.decryptVault(settings.vault, request.passphrase);
-    return { secret: totp.secret };
+    if (!config) throw new Error("Enter your setup key.");
+    return { secret: config.secret };
   }
   if (request?.type === "GET_LOCAL_CODE") {
-    const unlocked = await getUnlocked(settings.vault);
-    if (!unlocked) throw new Error("Unlock the saved key first.");
-    return ISCTOTP.generateTotp(unlocked.totp);
-  }
-  if (request?.type === "DELETE_KEY") {
-    await lockVault();
-    await chrome.storage.local.remove(["vault", "totp"]);
-    return { removed: true };
+    if (!config) throw new Error("Enter your setup key.");
+    return ISCTOTP.generateTotp(config);
   }
   return { error: "Unknown request." };
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  handleMessage(request, sender).then(sendResponse).catch((error) => sendResponse({ error: error.message || "OTP lookup failed." }));
+  handleMessage(request, sender).then(sendResponse).catch((error) => sendResponse({ error: error.message || "Operation failed." }));
   return true;
 });
