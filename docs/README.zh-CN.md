@@ -1,71 +1,47 @@
-# Science Tokyo OTP Autofill
+# Science Tokyo Autofill
 
 [English](../README.md) · [日本語](README.ja.md) · [简体中文](README.zh-CN.md)
 
-此Chrome扩展会在 `https://isct.ex-tic.com/auth/session/second_factor` 为**您自己的账户**选择OTP应用认证，使用保存的设置密钥（TOTP）在本机生成、填写并提交验证码。保存大学用户名和密码后，解锁期间可从 `https://isct.ex-tic.com/auth/session` 依次自动填写并提交用户名、密码和OTP。
+自动填写 Science Tokyo 登录信息，包括 OTP。大学用户名和密码可选保存。
 
-### 安装与使用
+## 安装与使用
 
-1. 下载此仓库，在Chrome中打开 `chrome://extensions`，开启**开发者模式**，点击**加载已解压的扩展程序**，选择仓库文件夹。
-2. 打开扩展的**详情 → 扩展程序选项**。
-3. **设置密钥：** 在大学设置页面点击 **Show secret key**，将Base32密钥粘贴到扩展的 **Setup key**。设置并确认至少6个字符的独有长口令，然后点击 **Save settings**。无需扫描二维码或注册Google Authenticator。如果大学要求首次验证代码，请点击扩展的 **Show current code** 并将代码输入大学页面完成注册。密钥必须与大学当前有效的注册一致。也支持已有的 `otpauth://totp` 链接。
-4. 如需自动填写用户名和密码，请在保存前输入大学登录信息。已有密钥时请先解锁，保持设置密钥栏为空，填写并确认当前或新的加密口令后保存。
-5. 安装更新后重新加载扩展。请在 **Passphrase to unlock or view the saved key** 输入加密口令，点击 **Unlock for 30 minutes**，然后打开或重新加载`https://isct.ex-tic.com/auth/session`。扩展会选择 **OTP (App) Authentication** 并生成、提交新代码。若已有手动输入或已选择其他方式，扩展不会自动提交。
+1. 下载并解压 ZIP。打开 `chrome://extensions`，开启开发者模式，加载解压后的文件夹。
+2. 在扩展程序设置中，将大学“显示密钥 / Show secret key”显示的字符串粘贴到“设置密钥”栏。如需要，再填写用户名和密码，然后点击“保存”。
+3. 打开 `https://isct.ex-tic.com/auth/session`，各步骤会自动填写并提交。重启 Chrome 后也可直接使用。
 
-## 多因素认证（OTP）应用认证设置
+## 获取设置密钥
 
-[图解设置指南](../help.zh-CN.html) · [大学官方指南](https://www.helpdesk.cii.isct.ac.jp/st/helpdesk/science-tokyo/login_guide.html)
+在大学 OTP 设置中，打开“应用认证 / App Authentication”的“设置 / Settings”。
 
-### 1. 打开OTP应用认证设置
+![OTP 设置](images/otp-settings-zh-CN.svg)
 
-在大学认证门户打开“多因素认证（OTP）”，点击“应用认证 / App Authentication”的“设置”。
+复制“显示密钥 / Show secret key”显示的字符串，粘贴到“设置密钥”栏。无需扫描二维码。
 
-![打开OTP应用认证设置](images/otp-settings-zh-CN.svg)
+![复制密钥](images/secret-key-zh-CN.svg)
 
-### 2. 显示、复制并粘贴密钥
+点击“保存”。大学页面要求输入验证码时，输入设置页面显示的6位数字并点击“设置”，即完成注册。
 
-点击“显示密钥 / Show secret key”。复制显示的字符串，粘贴到扩展的“设置密钥”栏，无需扫描二维码。
+![保存设置](images/extension-setup-zh-CN.svg)
 
-![显示、复制并粘贴密钥](images/secret-key-zh-CN.svg)
+仅在已注册、无法再次显示密钥且手头没有有效密钥时，点击“解除 / Remove”后重新注册。旧密钥将失效。
 
-### 3. 加密保存登录信息
+<details><summary>从旧版更新</summary>
 
-输入大学用户名、大学密码，以及至少6个字符的加密口令和确认栏，点击“保存设置”。这些数据一起加密。向已有密钥添加登录信息时请先解锁，保持设置密钥栏为空，填写并确认当前或新的加密口令后保存。
+替换扩展程序文件夹中的文件，并在 Chrome 中重新加载。输入一次旧版口令即可导入设置，之后不再需要口令。保存时设置密钥或密码留空，则保留已保存的值。
 
-![加密保存登录信息](images/extension-setup-zh-CN.svg)
+</details>
 
-### 4. 完成大学首次注册
+<details><summary>保存的数据</summary>
 
-如果大学首次注册尚未完成，请点击扩展的“显示当前验证码”，将六位代码输入大学的“令牌”栏并点击“设置”。以后解锁扩展，再打开或重新加载 https://isct.ex-tic.com/auth/session，即可依次自动填写和提交用户名、密码和OTP。
+设置经过加密，但加密密钥也保存在同一个 Chrome 配置文件中，能读取整个配置文件的人即可解密。请勿在公用电脑上使用。设置密钥不会发送到外部；发送给大学的只有您设置的登录信息和 OTP。在设置页面点击“删除保存的数据”即可全部删除。
 
-### 已使用应用认证的情况
+</details>
 
-**若已使用应用认证且无法再次显示密钥，必须在OTP设置 → App Authentication（应用认证）→ Remove（解除）中先删除旧注册，再重新设置以签发新密钥。将新显示的密钥粘贴到扩展，并再次完成大学首次注册。旧密钥将失效。若仍持有当前有效密钥，可直接使用，无需删除或重新签发。**
+## 开发
 
-此图仅为界面示意，示例文字不是实际密钥。
+`node --test test/core.test.js test/vault.test.js`
 
-大学设置密钥只需注册一次；每次解锁无需重新签发。扩展会在30分钟后、Chrome重启时、扩展重新加载或禁用时锁定，也可点击 **Lock now** 立即锁定。查看已保存密钥时，重新输入口令并点击 **Show saved key for 30 seconds**；30秒后或切换标签页时自动隐藏。更换口令时先解锁，保持 **Setup key** 为空，填写并确认新口令后保存。忘记口令无法恢复，需要重新输入原始密钥或在大学重新注册。
+`CHROME_BIN=/path/to/chrome-for-testing node test/browser-smoke.mjs`
 
-从0.2版本升级时，旧明文密钥不会用于自动登录。保持 **Setup key** 为空，填写并确认新口令后保存以迁移。加密保存成功后才删除旧明文存储项。
-
-**设置密钥**是注册身份验证器时显示的二维码中包含的固定秘密字符串。如果网站显示“手动输入密钥”，它就是同一个秘密。它不是大学密码，也不是应用当前显示的六位验证码。扩展使用此密钥生成验证码，无法直接读取您手机上的Google Authenticator。请勿将设置密钥发布到GitHub或聊天中。
-
-### 隐私与限制
-
-- 此仓库不包含个人大学登录信息或设置密钥。
-- 大学用户名、大学密码和设置密钥使用Web Crypto **AES-256-GCM** 加密，每次保存使用随机16字节盐和12字节nonce，通过 **PBKDF2-SHA256、600,000次迭代** 从口令导出加密密钥。`chrome.storage.local` 仅持久保存密文及公开参数，不保存口令或加密密钥。不会同步或上传；用户名和大学密码仅提交至大学的HTTPS登录表单，OTP提交至二次验证表单。设置密钥和加密口令不会提交。TOTP生成、解锁和本地查看不需要网络请求。
-- [Chrome存储本身不自动加密](https://developer.chrome.com/docs/extensions/develop/security-privacy/user-privacy)，本扩展在保存前加密。解锁期间，明文登录信息和TOTP配置仅保存在[内存中的 `chrome.storage.session`](https://developer.chrome.com/docs/extensions/reference/api/storage#property-session)。两个存储区域都限制为扩展的可信上下文；首次登录页面可请求用户名和大学密码，二次验证页面只能请求OTP。
-- 对被盗锁定存储的保护取决于口令强度。无法防止解锁或使用期间的恶意软件、扩展篡改、浏览器控制或键盘记录器。登录页面被攻击者控制时，登录信息和OTP也可能被窃取。尚未进行独立安全审计。
-- 清除浏览缓存不会删除密文。**删除已保存数据** 或卸载可删除当前存储项，但不能安全擦除旧版本明文的磁盘残片或备份副本。若担心此类副本，请迁移后在大学注册新密钥。
-- 自动填写会削弱此设备上的第二重验证。请仅用于自己的账户和可信设备。
-- 已根据提供的验证页面HTML，用虚拟令牌重建表单，并在浏览器中使用真实表单及输入框ID验证方式选择与正确表单的提交。用户已确认OTP可用。新增用户名和密码流程使用根据公开页面重建的模拟表单验证，尚未验证大学服务器是否接受此流程。网站HTML变更时，可能需要修改 `login_script.js` 或 `content_script.js`。
-
-## 验证
-
-6个字符仅为最低要求。使用更长且独有的口令可增强抗猜测能力。
-
-在仓库根目录运行 `node --test test/core.test.js test/vault.test.js`。使用Chrome for Testing或Chromium及虚构登录信息验证用户名 → 密码 → OTP、加密、解锁、自动锁定和语言切换。
-
-```sh
-CHROME_BIN=/path/to/chrome-for-testing node test/browser-smoke.mjs
-```
+浏览器测试使用模拟表单。用户已确认实际 OTP 可用；用户名和密码在实际环境中的表现尚未验证。
