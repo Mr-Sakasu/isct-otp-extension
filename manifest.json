@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Science Tokyo OTP Autofill",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Automatically enter your Science Tokyo username, password, and OTP after a one-time setup.",
   "minimum_chrome_version": "105",
   "action": {

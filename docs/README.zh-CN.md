@@ -2,7 +2,9 @@
 
 [English](../README.md) · [日本語](README.ja.md) · [简体中文](README.zh-CN.md)
 
-自动填写 Science Tokyo 登录信息，包括 OTP。大学用户名和密码可选保存。
+自动填写 Science Tokyo 登录信息，包括 OTP。可以单独保存已填写的项目，稍后再添加其余项目。
+
+[下载最新版 ZIP（v0.7.0）](https://github.com/Mr-Sakasu/isct-otp-extension/releases/download/v0.7.0/science-tokyo-autofill-v0.7.0.zip)
 
 ## 安装与使用
 
@@ -24,11 +26,13 @@
 
 ![保存设置](images/extension-setup-zh-CN.svg)
 
+留空的项目保留已保存的内容。打开“查看或删除保存的数据”，点击“显示已保存的内容”即可查看用户名、密码和设置密钥。再次点击即可隐藏。
+
 仅在已注册、无法再次显示密钥且手头没有有效密钥时，点击“解除 / Remove”后重新注册。旧密钥将失效。
 
 <details><summary>从旧版更新</summary>
 
-替换扩展程序文件夹中的文件，并在 Chrome 中重新加载。输入一次旧版口令即可导入设置，之后不再需要口令。保存时设置密钥或密码留空，则保留已保存的值。
+解压上面的 ZIP，替换当前扩展程序文件夹中的文件，然后在 `chrome://extensions` 中重新加载扩展程序。已保存的设置会保留。如提示输入旧版口令，输入一次即可导入设置，之后不再需要口令。
 
 </details>
 

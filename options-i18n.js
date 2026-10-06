@@ -1,6 +1,15 @@
 const ISCTLocale = (() => {
   const language = document.documentElement.lang;
   const messages = {
+    "Show saved settings": ["保存した内容を表示", "显示已保存的内容"],
+    "Hide saved settings": ["保存した内容を隠す", "隐藏已保存的内容"],
+    "Saved. Add your setup key to enable OTP entry.": ["保存済みです。設定キーを追加するとOTPも自動入力できます。", "已保存。添加设置密钥后即可自动填写 OTP。"],
+    "You can save one field at a time.": ["入力した項目だけでも保存できます。", "可以单独保存已填写的项目。"],
+    "Saved. You can add the remaining settings later.": ["保存しました。残りの項目はあとから追加できます。", "已保存。其余项目可以稍后添加。"],
+    "Enter at least one setting.": ["保存する項目を入力してください。", "请输入要保存的项目。"],
+    "Enter a valid university password.": ["大学のパスワードを正しく入力してください。", "请输入正确的大学密码。"],
+    "No saved settings.": ["保存した内容はありません。", "没有已保存的内容。"],
+    "Import previous settings before saving.": ["以前のパスフレーズで旧版の設定を引き継いでから保存してください。", "请先使用旧版口令导入设置，再保存。"],
     "Show saved key": ["保存したキーを表示", "显示已保存的密钥"],
     "Hide saved key": ["キーを隠す", "隐藏密钥"],
     "Saved. Automatic entry is ready.": ["保存済みです。自動入力できます。", "已保存，可以自动填写。"],

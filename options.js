@@ -1,6 +1,9 @@
 const secretInput = document.getElementById("secret");
 const statusText = document.getElementById("status");
 const revealedKey = document.getElementById("revealedKey");
+const revealedSettings = document.getElementById("revealedSettings");
+const revealedUsername = document.getElementById("revealedUsername");
+const revealedPassword = document.getElementById("revealedPassword");
 const showKeyButton = document.getElementById("showKey");
 let codeTimer = null;
 let codeVersion = 0;
@@ -20,8 +23,11 @@ async function request(message) {
 function hideKey() {
   keyVersion++;
   revealedKey.value = "";
+  revealedUsername.value = "";
+  revealedPassword.value = "";
   revealedKey.hidden = true;
-  showKeyButton.textContent = ISCTLocale.text("Show saved key");
+  revealedSettings.hidden = true;
+  showKeyButton.textContent = ISCTLocale.text("Show saved settings");
 }
 
 function stopCode() {
@@ -42,9 +48,9 @@ async function updateCode(version) {
 async function refresh() {
   const settings = await request({ type: "GET_SETTINGS" });
   document.getElementById("migration").hidden = !settings.needsMigration;
-  document.getElementById("secretState").textContent = ISCTLocale.text(settings.ready ? "Saved. Automatic entry is ready." : "Enter your setup key and save.");
+  document.getElementById("secretState").textContent = ISCTLocale.text(settings.ready ? "Saved. Automatic entry is ready." : settings.saved ? "Saved. Add your setup key to enable OTP entry." : "You can save one field at a time.");
   if (!document.getElementById("username").value) document.getElementById("username").value = settings.username;
-  showKeyButton.disabled = !settings.ready;
+  showKeyButton.disabled = !settings.saved;
   document.getElementById("codeSection").hidden = !settings.ready;
   if (!settings.ready || document.hidden) stopCode();
   else if (codeTimer === null) {
@@ -74,10 +80,10 @@ document.getElementById("save").addEventListener("click", () => act(async () => 
   const message = { type: "SAVE_SETTINGS", secret: secretInput.value.trim(),
     username: document.getElementById("username").value.trim(), password: document.getElementById("universityPassword").value };
   status("Saving…");
-  await request(message);
+  const result = await request(message);
   secretInput.value = "";
   document.getElementById("universityPassword").value = "";
-  status("Saved. Open the university login page.");
+  status(result.ready ? "Saved. Open the university login page." : "Saved. You can add the remaining settings later.");
 }));
 
 document.getElementById("migrate").addEventListener("click", () => act(async () => {
@@ -91,11 +97,14 @@ document.getElementById("migrate").addEventListener("click", () => act(async () 
 showKeyButton.addEventListener("click", () => act(async () => {
   if (!revealedKey.hidden) return hideKey();
   const version = ++keyVersion;
-  const result = await request({ type: "REVEAL_KEY" });
+  const result = await request({ type: "REVEAL_SETTINGS" });
   if (version !== keyVersion || document.hidden) return;
   revealedKey.value = result.secret;
+  revealedUsername.value = result.username;
+  revealedPassword.value = result.password;
   revealedKey.hidden = false;
-  showKeyButton.textContent = ISCTLocale.text("Hide saved key");
+  revealedSettings.hidden = false;
+  showKeyButton.textContent = ISCTLocale.text("Hide saved settings");
 }));
 
 document.getElementById("removeSecret").addEventListener("click", () => act(async () => {

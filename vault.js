@@ -5,20 +5,28 @@
   const ITERATIONS = 600000;
   const aad = new TextEncoder().encode("Science Tokyo OTP vault v1");
 
-  function validateConfig(config) {
-    if (!config || typeof config.secret !== "string" || config.secret.length > 512 ||
+  function validateConfig(config, allowPartial = false) {
+    if (!config || typeof config !== "object" || Array.isArray(config)) throw new Error("Invalid saved setup key.");
+    let normalized = {};
+    if (!allowPartial || config.secret !== undefined) {
+      if (typeof config.secret !== "string" || config.secret.length > 512 ||
         !Number.isInteger(config.period) || config.digits !== 6) {
+        throw new Error("Invalid saved setup key.");
+      }
+      normalized = otp.parseTotpSecret(`otpauth://totp/key?secret=${encodeURIComponent(config.secret)}&period=${config.period}&digits=${config.digits}`);
+    } else if (config.period !== undefined || config.digits !== undefined) {
       throw new Error("Invalid saved setup key.");
     }
-    const normalized = otp.parseTotpSecret(`otpauth://totp/key?secret=${encodeURIComponent(config.secret)}&period=${config.period}&digits=${config.digits}`);
     if (config.username !== undefined) {
       if (typeof config.username !== "string" || !config.username.trim() || config.username.length > 256) throw new Error("Enter a valid university username.");
       normalized.username = config.username.trim();
     }
     if (config.password !== undefined) {
-      if (typeof config.password !== "string" || !config.password || config.password.length > 1024 || !normalized.username) throw new Error("Enter a university username and password.");
+      if (typeof config.password !== "string" || !config.password || config.password.length > 1024) throw new Error("Enter a valid university password.");
+      if (!allowPartial && !normalized.username) throw new Error("Enter a university username and password.");
       normalized.password = config.password;
     }
+    if (!Object.keys(normalized).length) throw new Error("Enter at least one setting.");
     return normalized;
   }
 
@@ -89,7 +97,7 @@
   }
 
   async function encryptAutomatic(config, deviceKey) {
-    const normalized = validateConfig(config);
+    const normalized = validateConfig(config, true);
     const key = await deviceCryptoKey(deviceKey);
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const ciphertext = await crypto.subtle.encrypt(
@@ -111,7 +119,7 @@
       const plaintext = await crypto.subtle.decrypt(
         { name: "AES-GCM", iv, additionalData: automaticAad, tagLength: 128 }, key, ciphertext
       );
-      return validateConfig(JSON.parse(new TextDecoder().decode(plaintext)));
+      return validateConfig(JSON.parse(new TextDecoder().decode(plaintext)), true);
     } catch {
       throw new Error("Saved settings could not be read. Enter your setup key again.");
     }

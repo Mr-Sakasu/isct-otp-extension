@@ -3,14 +3,14 @@
 <body>
 <nav aria-label="语言"><a href="options.html" lang="en">English</a> · <a href="options.ja.html" lang="ja">日本語</a> · <a href="options.zh-CN.html" lang="zh-CN">简体中文</a></nav>
 <h1>Science Tokyo Autofill</h1>
-<p>保存后，在大学登录页面自动填写。</p>
+<p>可以单独保存已填写的项目，稍后再添加其余项目。留空的项目保留已保存的内容。</p>
 <section id="migration" hidden><p>输入一次旧版口令，即可导入旧版设置。</p><label for="legacyPassphrase">旧版口令</label><input id="legacyPassphrase" type="password" autocomplete="off"><button id="migrate" type="button">导入</button></section>
 <label for="secret">设置密钥</label>
 <input id="secret" type="password" autocomplete="off" spellcheck="false" placeholder="粘贴 Show secret key 显示的字符串">
 <small>留空保存时，继续使用已保存的密钥。</small>
-<label for="username">大学用户名（可选）</label>
+<label for="username">大学用户名</label>
 <input id="username" type="text" autocomplete="off" spellcheck="false" maxlength="256">
-<label for="universityPassword">大学登录密码（可选）</label>
+<label for="universityPassword">大学登录密码</label>
 <input id="universityPassword" type="password" autocomplete="off" spellcheck="false" maxlength="1024" placeholder="留空则保留已保存的密码">
 <button id="save" type="button">保存</button>
 <p id="status" role="status" aria-live="polite"></p>
@@ -18,6 +18,6 @@
 <section id="codeSection" hidden><label for="currentCode">当前验证码</label><output id="currentCode"></output><small id="codeExpiry"></small><small>大学注册时如要求输入验证码，请输入这6位数字。</small></section>
 <p><a href="help.zh-CN.html">设置指南</a></p>
 <small>数据保存在此 Chrome 配置文件中。请只在自己的电脑上使用。</small>
-<details id="savedData"><summary>查看或删除保存的数据</summary><button id="showKey" class="secondary" type="button">显示已保存的密钥</button><input id="revealedKey" type="text" readonly hidden aria-label="已保存的设置密钥" autocomplete="off" spellcheck="false"><button id="removeSecret" class="secondary" type="button">删除保存的数据</button></details>
+<details id="savedData"><summary>查看或删除保存的数据</summary><button id="showKey" class="secondary" type="button">显示已保存的内容</button><section id="revealedSettings" hidden><label for="revealedUsername">已保存的大学用户名</label><input id="revealedUsername" type="text" readonly autocomplete="off" spellcheck="false" placeholder="未保存"><label for="revealedPassword">已保存的大学密码</label><input id="revealedPassword" type="text" readonly autocomplete="off" spellcheck="false" placeholder="未保存"><label for="revealedKey">已保存的设置密钥</label><input id="revealedKey" type="text" readonly hidden autocomplete="off" spellcheck="false" placeholder="未保存"></section><button id="removeSecret" class="secondary" type="button">删除保存的数据</button></details>
 <script src="options-i18n.js"></script><script src="options.js"></script>
 </body></html>

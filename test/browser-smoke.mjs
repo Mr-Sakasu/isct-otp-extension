@@ -189,7 +189,47 @@ try {
   assert.deepEqual(await evaluate(page, '[...document.querySelectorAll("input")].filter(el=>el.getClientRects().length>0).map(el=>el.id)'), ["secret", "username", "universityPassword"]);
   assert.equal(await evaluate(page, '!!document.getElementById("unlock") || !!document.getElementById("newPassphrase")'), false);
   await evaluate(page, 'document.getElementById("save").click()');
-  await waitForUi('document.getElementById("status").textContent === "Enter your setup key."', "require setup key");
+  await waitForUi('document.getElementById("status").textContent === "Enter at least one setting."', "require one field");
+  for (const [field, value] of [["username", username], ["universityPassword", universityPassword]]) {
+    await navigateOptions();
+    await optionsCall({ type: "DELETE_KEY" });
+    await navigateOptions();
+    await evaluate(page, `document.getElementById(${JSON.stringify(field)}).value=${JSON.stringify(value)};document.getElementById("save").click()`);
+    await waitForUi('document.getElementById("status").textContent === "Saved. You can add the remaining settings later." && !document.getElementById("save").disabled', `save ${field} alone`);
+    const partial = await optionsCall({ type: "GET_SETTINGS" });
+    assert.equal(partial.saved, true);
+    assert.equal(partial.ready, false);
+    assert.equal(partial.username, field === "username" ? username : "");
+    assert.equal(partial.passwordSaved, field === "universityPassword");
+    assert.ok((await optionsCall({ type: "GET_LOCAL_CODE" })).error);
+    assert.deepEqual(await evaluate(worker, 'handleMessage({type:"GET_STATUS"},{id:chrome.runtime.id,url:"https://isct.ex-tic.com/auth/session/second_factor",tab:{id:1}})'), { ready: false });
+    assert.ok((await evaluate(worker, 'handleMessage({type:"GET_CODE"},{id:chrome.runtime.id,url:"https://isct.ex-tic.com/auth/session/second_factor",tab:{id:1}})')).error);
+    assert.equal(await evaluate(page, 'document.getElementById("codeSection").hidden'), true);
+    await navigateOptions();
+    await evaluate(page, 'document.getElementById("savedData").open=true;document.getElementById("showKey").click()');
+    await waitForUi('!document.getElementById("revealedSettings").hidden', `reveal ${field} after reload`);
+    assert.deepEqual(await evaluate(page, '["revealedKey","revealedUsername","revealedPassword"].map(id=>document.getElementById(id).value)'), ["", field === "username" ? username : "", field === "universityPassword" ? universityPassword : ""]);
+    await evaluate(page, 'document.getElementById("showKey").click()');
+    await waitForUi('document.getElementById("revealedSettings").hidden', "hide partial settings");
+    assert.deepEqual(await evaluate(page, '["revealedKey","revealedUsername","revealedPassword"].map(id=>document.getElementById(id).value)'), ["", "", ""]);
+    await navigateWithMock(fixtureHtml.replace('data-test-case="fixture"', 'data-test-case="partial"'), "partial");
+    await delay(300);
+    assert.equal((await evaluate(page, "fixtureResult")).submitCount, 0);
+    await navigateWithMock(loginHtml, "login", "https://isct.ex-tic.com/auth/session");
+    if (field === "username") await waitForUi('window.loginResult?.usernameSubmits === 1', "username-only login");
+    else await delay(300);
+    assert.equal((await evaluate(page, "loginResult")).passwordSubmits, 0);
+    if (field === "universityPassword") {
+      assert.equal((await evaluate(page, "loginResult")).usernameSubmits, 0);
+      assert.equal((await evaluate(worker, 'handleMessage({type:"GET_LOGIN_VALUE",field:"password"},{id:chrome.runtime.id,url:"https://isct.ex-tic.com/auth/session",tab:{id:1}})')).value, "");
+    }
+  }
+  await navigateOptions();
+  await evaluate(page, `document.getElementById("username").value=${JSON.stringify(username)};document.getElementById("save").click()`);
+  await waitForUi('document.getElementById("status").textContent.startsWith("Saved.") && !document.getElementById("save").disabled', "add username to saved password");
+  assert.deepEqual(await optionsCall({ type: "REVEAL_SETTINGS" }), { secret: "", username, password: universityPassword });
+  assert.equal((await optionsCall({ type: "GET_SETTINGS" })).ready, false);
+  console.log("Partial settings: username-only and password-only save, survive reload, reveal and hide; missing OTP stays inactive and blank fields preserve saved values.");
   await evaluate(page, `document.getElementById("secret").value=${JSON.stringify(secret)};document.getElementById("save").click()`);
   await waitForUi('document.getElementById("status").textContent.startsWith("Saved.") && !document.getElementById("save").disabled', "save with no encryption passphrase");
   await waitForUi('/^[0-9]{6}$/.test(document.getElementById("currentCode").textContent)', "code appears automatically");
@@ -200,6 +240,8 @@ try {
   await evaluate(page, 'document.getElementById("savedData").open=true;document.getElementById("showKey").click()');
   await waitForUi('!document.getElementById("revealedKey").hidden', "show key without a passphrase");
   assert.equal(await evaluate(page, 'document.getElementById("revealedKey").value'), secret);
+  assert.equal(await evaluate(page, 'document.getElementById("revealedUsername").value'), username);
+  assert.equal(await evaluate(page, 'document.getElementById("revealedPassword").value'), universityPassword);
   await evaluate(page, 'document.getElementById("showKey").click()');
   await waitForUi('document.getElementById("revealedKey").hidden', "hide key");
   console.log("Simple setup: three fields, Save once, current code visible, no unlock or new passphrase.");
@@ -218,6 +260,8 @@ try {
   assert.equal((await evaluate(page, "fixtureResult")).submitCount, 0);
   await navigateOptions();
   assert.equal(await evaluate(page, 'document.getElementById("migration").hidden'), false);
+  assert.ok((await optionsCall({ type: "SAVE_SETTINGS", username })).error);
+  assert.deepEqual((await evaluate(worker, 'chrome.storage.local.get("vault")')).vault, legacyVault);
   await evaluate(page, 'document.getElementById("legacyPassphrase").value="incorrect old passphrase";document.getElementById("migrate").click()');
   await waitForUi('document.getElementById("status").textContent.startsWith("Incorrect passphrase")', "wrong import passphrase");
   assert.deepEqual((await evaluate(worker, 'chrome.storage.local.get("vault")')).vault, legacyVault);
@@ -234,7 +278,7 @@ try {
   await evaluate(page, 'document.getElementById("save").click()');
   await waitForUi('document.getElementById("status").textContent.startsWith("Saved.") && !document.getElementById("save").disabled', "blank fields keep saved data");
   assert.equal((await optionsCall({ type: "REVEAL_KEY" })).secret, secret);
-  for (const type of ["GET_SETTINGS", "REVEAL_KEY", "GET_LOCAL_CODE", "MIGRATE_LEGACY", "DELETE_KEY", "SAVE_SETTINGS"]) {
+  for (const type of ["GET_SETTINGS", "REVEAL_KEY", "REVEAL_SETTINGS", "GET_LOCAL_CODE", "MIGRATE_LEGACY", "DELETE_KEY", "SAVE_SETTINGS"]) {
     const denied = await evaluate(worker, `handleMessage({type:${JSON.stringify(type)}},{id:chrome.runtime.id,url:"https://isct.ex-tic.com/auth/session/second_factor",tab:{id:1}})`);
     assert.ok(denied.error);
   }
@@ -362,6 +406,7 @@ try {
     await page.send("Page.navigate", { url });
     await waitForUi('!!document.getElementById("secretState")?.textContent', `options ${language}`);
     assert.equal(await evaluate(page, "document.documentElement.lang"), language);
+    assert.doesNotMatch(await evaluate(page, '[...document.querySelectorAll("label")].map(el=>el.textContent).join(" ")'), /optional|任意|可选/);
     assert.equal(await evaluate(page, '!!document.getElementById("unlock") || !!document.getElementById("newPassphrase") || !!document.getElementById("mode") || !!document.getElementById("connectGmail")'), false);
     assert.equal(await evaluate(page, 'document.getElementById("migration").hidden'), true);
     assert.equal((await optionsCall({ type: "GET_SETTINGS" })).ready, true);
@@ -369,6 +414,12 @@ try {
     await waitForUi('/^[0-9]{6}$/.test(document.getElementById("currentCode").textContent)', `current code ${language}`);
     if (language === "ja") assert.match(await evaluate(page, 'document.getElementById("codeExpiry").textContent'), /[0-9]+秒/);
     if (language === "zh-CN") assert.match(await evaluate(page, 'document.getElementById("codeExpiry").textContent'), /秒/);
+    await evaluate(page, 'document.getElementById("savedData").open=true;document.getElementById("showKey").click()');
+    await waitForUi('!document.getElementById("revealedSettings").hidden', `show saved settings ${language}`);
+    assert.deepEqual(await evaluate(page, '["revealedKey","revealedUsername","revealedPassword"].map(id=>document.getElementById(id).value)'), [secret, username, universityPassword]);
+    await evaluate(page, 'document.getElementById("savedData").open=false');
+    await waitForUi('document.getElementById("revealedSettings").hidden', `closing saved data hides fields ${language}`);
+    assert.deepEqual(await evaluate(page, '["revealedKey","revealedUsername","revealedPassword"].map(id=>document.getElementById(id).value)'), ["", "", ""]);
     if (language === "ja") {
       const { data } = await page.send("Page.captureScreenshot", { captureBeyondViewport: true });
       await writeFile(path.join(profile, "options-ja.png"), Buffer.from(data, "base64"));
@@ -377,7 +428,8 @@ try {
   for (const [language, filename] of [["en", "help.html"], ["ja", "help.ja.html"], ["zh-CN", "help.zh-CN.html"]]) {
     const url = await evaluate(worker, `chrome.runtime.getURL(${JSON.stringify(filename)})`);
     await page.send("Page.navigate", { url });
-    await waitForUi('document.images.length === 3 && [...document.images].every(img=>img.complete && img.naturalWidth>0)', `guide images ${language}`);
+    const imageCount = language === "ja" ? 5 : 3;
+    await waitForUi(`document.images.length === ${imageCount} && [...document.images].every(img=>img.complete && img.naturalWidth>0)`, `guide images ${language}`);
     assert.equal(await evaluate(page, "document.documentElement.lang"), language);
     assert.deepEqual(await evaluate(page, '[...document.querySelectorAll("nav a")].map(a=>a.getAttribute("href"))'), ["help.html", "help.ja.html", "help.zh-CN.html"]);
     assert.match(await evaluate(page, "document.body.textContent"), /App Authentication/);
@@ -386,6 +438,7 @@ try {
       const overflow = await evaluate(page, `(async () => {
         const overflow = [];
         for (const image of document.images) {
+          if (!new URL(image.src).pathname.endsWith(".svg")) continue;
           const source = await fetch(image.src).then(response => response.text());
           const svg = new DOMParser().parseFromString(source, "image/svg+xml").documentElement;
           const holder = document.createElement("div");

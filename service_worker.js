@@ -49,13 +49,14 @@ async function handleMessage(request, sender) {
     if (LOGIN_URL.test(sender.url || "")) {
       if (request?.type !== "GET_LOGIN_VALUE" || !["username", "password"].includes(request.field)) return { error: "Request denied." };
       const config = await loadConfig();
-      return { value: config?.[request.field] || "", ...(request.field === "password" ? { account: config?.username || "" } : {}) };
+      const value = request.field === "password" && !config?.username ? "" : config?.[request.field] || "";
+      return { value, ...(request.field === "password" ? { account: config?.username || "" } : {}) };
     }
     if (!SITE_URL.test(sender.url || "")) return { error: "Request denied." };
     if (request?.type !== "GET_STATUS" && request?.type !== "GET_CODE") return { error: "Request denied." };
     const config = await loadConfig();
-    if (request.type === "GET_STATUS") return { ready: !!config };
-    if (!config) return { error: "Save your setup key in extension settings first." };
+    if (request.type === "GET_STATUS") return { ready: !!config?.secret };
+    if (!config?.secret) return { error: "Save your setup key in extension settings first." };
     const result = await ISCTOTP.generateTotp(config);
     return result.remainingSeconds < 6 ? { pending: true } : { code: result.code };
   });
@@ -75,16 +76,17 @@ async function handleOptions(request) {
   }
   if (request?.type === "GET_SETTINGS") {
     const { vault } = await chrome.storage.local.get("vault");
-    return { ready: !!config, needsMigration: !config && !!vault, username: config?.username || "", passwordSaved: !!config?.password };
+    return { saved: !!config, ready: !!config?.secret, needsMigration: !config && !!vault, username: config?.username || "", passwordSaved: !!config?.password };
   }
   if (request?.type === "SAVE_SETTINGS") {
     let next = config ? { ...config } : {};
     if (request.secret) next = { ...next, ...ISCTOTP.parseTotpSecret(request.secret) };
-    if (!next.secret) throw new Error("Enter your setup key.");
     if (request.username) next.username = request.username;
     if (request.password) next.password = request.password;
+    const { vault } = await chrome.storage.local.get("vault");
+    if (!config && vault && !next.secret) throw new Error("Import previous settings before saving.");
     await saveConfig(next);
-    return { saved: true };
+    return { saved: true, ready: !!next.secret };
   }
   if (request?.type === "MIGRATE_LEGACY") {
     const { vault } = await chrome.storage.local.get("vault");
@@ -93,12 +95,16 @@ async function handleOptions(request) {
     await saveConfig(previous);
     return { imported: true };
   }
+  if (request?.type === "REVEAL_SETTINGS") {
+    if (!config) throw new Error("No saved settings.");
+    return { secret: config.secret || "", username: config.username || "", password: config.password || "" };
+  }
   if (request?.type === "REVEAL_KEY") {
-    if (!config) throw new Error("Enter your setup key.");
+    if (!config?.secret) throw new Error("Enter your setup key.");
     return { secret: config.secret };
   }
   if (request?.type === "GET_LOCAL_CODE") {
-    if (!config) throw new Error("Enter your setup key.");
+    if (!config?.secret) throw new Error("Enter your setup key.");
     return ISCTOTP.generateTotp(config);
   }
   return { error: "Unknown request." };

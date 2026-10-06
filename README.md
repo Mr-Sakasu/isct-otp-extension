@@ -2,7 +2,9 @@
 
 [English](README.md) · [日本語](docs/README.ja.md) · [简体中文](docs/README.zh-CN.md)
 
-Fills in the Science Tokyo login, including the OTP. University username and password are optional.
+Fills in the Science Tokyo login, including the OTP. Save any completed field and add the rest later.
+
+[Download the latest ZIP (v0.7.0)](https://github.com/Mr-Sakasu/isct-otp-extension/releases/download/v0.7.0/science-tokyo-autofill-v0.7.0.zip)
 
 ## Install and use
 
@@ -24,11 +26,13 @@ Save. If the university asks for a code, enter the six-digit code shown in exten
 
 ![Save settings](docs/images/extension-setup-en.svg)
 
+Blank fields keep their saved values. Open View or remove saved data and click Show saved settings to view the saved username, password, and setup key. Click again to hide them.
+
 If you are already enrolled, cannot show the key again, and have no valid key, click Remove and enroll again. The old key stops working.
 
 <details><summary>Updating from an older version</summary>
 
-Replace the files in your extension folder and reload it in Chrome. Enter the old passphrase once to import your settings; it is not needed after that. Leaving the setup key or password blank when saving keeps the saved value.
+Extract the ZIP above, replace the files in your current extension folder, and reload the extension at `chrome://extensions`. Saved settings are retained. If asked, enter the old passphrase once to import your settings; it is not needed after that.
 
 </details>
 

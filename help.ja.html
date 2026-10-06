@@ -1,8 +1,29 @@
-<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>設定ガイド</title><style>body{font:16px/1.6 system-ui,sans-serif;max-width:800px;margin:2rem auto;padding:0 1rem;color:#183044}img{width:100%;height:auto}h1{font-size:1.6rem}h2{font-size:1.2rem}</style></head><body>
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>設定ガイド</title><style>body{font:16px/1.6 system-ui,sans-serif;max-width:800px;margin:2rem auto;padding:0 1rem;color:#183044}img{display:block;width:100%;height:auto}h1{font-size:1.6rem}h2{font-size:1.2rem}figure{margin:1rem 0 2rem}figcaption,small{font-size:.875rem;color:#485e6d}summary{cursor:pointer}</style></head><body>
 <nav aria-label="言語"><a href="help.html" lang="en">English</a> · <a href="help.ja.html" lang="ja">日本語</a> · <a href="help.zh-CN.html" lang="zh-CN">简体中文</a></nav>
 <h1>設定ガイド</h1><p><a href="options.ja.html">拡張機能の設定を開く</a> · <a href="https://www.helpdesk.cii.isct.ac.jp/st/helpdesk/science-tokyo/login_guide.html">大学の公式ガイド</a></p>
-<h2>1. アプリ認証の設定を開く</h2><p>大学のOTP設定で「アプリ認証 / App Authentication」の「設定 / Settings」を開きます。</p><img src="docs/images/otp-settings-ja.svg" alt="OTPのアプリ認証設定">
-<h2>2. 設定キーをコピーする</h2><p>「シークレットキーを表示する / Show secret key」の文字列を、拡張機能の「設定キー」欄に貼り付けます。QRコードの読み取りは不要です。</p><img src="docs/images/secret-key-ja.svg" alt="設定キーをコピーする">
-<h2>3. 保存する</h2><p>必要なら大学のユーザー名とログインパスワードも入れて「保存」します。以後は https://isct.ex-tic.com/auth/session を開くと自動入力されます。</p><img src="docs/images/extension-setup-ja.svg" alt="拡張機能の設定を保存する"><p>大学の画面でコードを求められたら、設定画面に出る6桁を入力し「設定」を押すと登録完了です。</p>
-<details><summary>登録済みでキーを再表示できない場合</summary><p>有効なキーが手元にない場合だけ「解除 / Remove」し、登録し直してください。古いキーは使えなくなります。</p></details><small>図のキーは架空の例です。</small>
+<h2>1. アプリ認証の設定を開く</h2>
+<p>大学の「多要素認証（OTP） / Multi-Factor Authentication (OTP)」を開きます。利用状況に合わせて、次のどちらかの手順で進めます。</p>
+<h3>初めて利用する人</h3>
+<p>「アプリ認証 / App Authentication」が「未設定 / Unset」なら、「設定 / Setup」を押します。その後、下の「2. 設定キーをコピーする」に進みます。</p>
+<figure><img src="docs/images/science-tokyo-setup-redacted.png" width="1280" height="800" alt="アプリ認証が未設定の画面。赤丸のSetupボタンを押す"><figcaption>赤丸の「Setup」から設定を始めます。</figcaption></figure>
+<h3>既にLMSにログインしたことがある人</h3>
+<p>「アプリ認証」が「設定済み / Already Set」で、キーを再表示できず、有効なキーも手元にない場合は、次の手順で取得し直します。</p>
+<ol><li><strong>アプリ認証の行</strong>の「解除 / Remove」を押します。</li><li>「設定 / Setup」を押し、下の「2. 設定キーをコピーする」に進みます。</li></ol>
+<p>「解除」すると古いキーは使えなくなります。以前のキーを登録した認証アプリも、新しいキーで登録し直してください。</p>
+<figure><img src="docs/images/science-tokyo-enrolled.png" width="1280" height="800" alt="アプリ認証がAlready Setの画面。アプリ認証の行にRemoveボタンがある"><figcaption>「App Authentication」の行の「Remove」を押します。</figcaption></figure>
+<p>LMSを利用したことがあっても、アプリ認証が「未設定 / Unset」なら、上の「初めて利用する人」と同じ手順で進めます。</p>
+<p>有効な設定キーを持っている場合は、そのキーを使って「3. 拡張機能に保存する」に進みます。</p>
+<h2>2. 設定キーをコピーする</h2>
+<p>「シークレットキーを表示する / Show secret key」を開き、「コピー / Copy」を押します。拡張機能の「設定キー」欄に貼り付けます。QRコードの読み取りは不要です。</p>
+<figure><img src="docs/images/science-tokyo-copy-redacted.png" width="1280" height="800" alt="Show secret keyを開いた画面。赤丸のCopyボタンで設定キーをコピーする"><figcaption>赤丸の「Copy」で設定キーをコピーします。</figcaption></figure>
+<h2>3. 拡張機能に保存する</h2>
+<p>必要なら大学のユーザー名とログインパスワードも入れて「保存」を押します。</p>
+<p>入力した項目だけでも保存できます。残りはあとから追加でき、空欄の項目は保存済みの内容を使います。</p>
+<figure><img src="docs/images/extension-setup-ja.svg" width="900" height="555" alt="拡張機能の設定キー欄に貼り付け、保存する図"></figure>
+<p>大学の登録画面でコードを求められたら、拡張機能の設定画面に出る6桁を入力し、大学側の「設定」を押すと登録完了です。</p>
+<p>「保存データの確認・削除」を開いて「保存した内容を表示」を押すと、ユーザー名・パスワード・設定キーを確認できます。もう一度押すと隠れます。</p>
+<h2>4. ログインする</h2>
+<p><a href="https://isct.ex-tic.com/auth/session">大学のログイン画面</a>を開くと、保存したログイン情報とOTPを自動で入力・送信します。ユーザー名とパスワードを保存していない場合は、手動で入力します。Chromeを再起動してもそのまま使えます。</p>
+<figure><img src="docs/images/science-tokyo-login.png" width="1280" height="800" alt="大学のログイン画面。User Name欄にScience Tokyo IDを入力する"></figure>
+<p><small>画面画像の個人情報・QRコード・設定キーは伏せてあります。拡張機能の設定図は架空の例です。</small></p>
 </body></html>

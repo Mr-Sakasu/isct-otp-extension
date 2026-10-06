@@ -3,14 +3,14 @@
 <body>
 <nav aria-label="言語"><a href="options.html" lang="en">English</a> · <a href="options.ja.html" lang="ja">日本語</a> · <a href="options.zh-CN.html" lang="zh-CN">简体中文</a></nav>
 <h1>Science Tokyo Autofill</h1>
-<p>保存すると、大学のログイン画面で自動入力します。</p>
+<p>入力した項目だけでも保存できます。残りはあとから追加でき、空欄の項目は保存済みの内容を使います。</p>
 <section id="migration" hidden><p>旧版の設定は、以前のパスフレーズを一度入力すると引き継げます。</p><label for="legacyPassphrase">以前のパスフレーズ</label><input id="legacyPassphrase" type="password" autocomplete="off"><button id="migrate" type="button">引き継ぐ</button></section>
 <label for="secret">設定キー</label>
 <input id="secret" type="password" autocomplete="off" spellcheck="false" placeholder="Show secret key の文字列を貼り付け">
 <small>空欄で保存すると、保存済みのキーをそのまま使います。</small>
-<label for="username">大学のユーザー名（任意）</label>
+<label for="username">大学のユーザー名</label>
 <input id="username" type="text" autocomplete="off" spellcheck="false" maxlength="256">
-<label for="universityPassword">大学のログインパスワード（任意）</label>
+<label for="universityPassword">大学のログインパスワード</label>
 <input id="universityPassword" type="password" autocomplete="off" spellcheck="false" maxlength="1024" placeholder="空欄なら保存済みのまま">
 <button id="save" type="button">保存</button>
 <p id="status" role="status" aria-live="polite"></p>
@@ -18,6 +18,6 @@
 <section id="codeSection" hidden><label for="currentCode">現在のコード</label><output id="currentCode"></output><small id="codeExpiry"></small><small>大学の登録画面でコードを求められたら、この6桁を入力します。</small></section>
 <p><a href="help.ja.html">設定ガイド</a></p>
 <small>データはこのChromeプロファイル内に保存されます。自分専用のパソコンで使ってください。</small>
-<details id="savedData"><summary>保存データの確認・削除</summary><button id="showKey" class="secondary" type="button">保存したキーを表示</button><input id="revealedKey" type="text" readonly hidden aria-label="保存した設定キー" autocomplete="off" spellcheck="false"><button id="removeSecret" class="secondary" type="button">保存データを削除</button></details>
+<details id="savedData"><summary>保存データの確認・削除</summary><button id="showKey" class="secondary" type="button">保存した内容を表示</button><section id="revealedSettings" hidden><label for="revealedUsername">保存したユーザー名</label><input id="revealedUsername" type="text" readonly autocomplete="off" spellcheck="false" placeholder="未保存"><label for="revealedPassword">保存したパスワード</label><input id="revealedPassword" type="text" readonly autocomplete="off" spellcheck="false" placeholder="未保存"><label for="revealedKey">保存した設定キー</label><input id="revealedKey" type="text" readonly hidden autocomplete="off" spellcheck="false" placeholder="未保存"></section><button id="removeSecret" class="secondary" type="button">保存データを削除</button></details>
 <script src="options-i18n.js"></script><script src="options.js"></script>
 </body></html>

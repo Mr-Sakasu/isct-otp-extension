@@ -62,3 +62,26 @@ test("automatic storage works without a passphrase and detects modified data or 
   }
   await assert.rejects(decryptAutomatic({ ...record, version: 1 }, deviceKey), /Invalid encrypted/);
 });
+
+test("automatic storage encrypts each field and every partial combination independently", async () => {
+  const { createDeviceKey, encryptAutomatic, decryptAutomatic } = require("../vault.js");
+  const deviceKey = createDeviceKey();
+  const username = "test-science-tokyo-id";
+  const password = "test-only university password ";
+  for (const data of [
+    { username }, { password }, config, { username, password },
+    { ...config, username }, { ...config, password }, { ...config, username, password }
+  ]) {
+    const record = await encryptAutomatic(data, deviceKey);
+    assert.deepEqual(await decryptAutomatic(record, deviceKey), data);
+    for (const value of [data.username, data.password, data.secret].filter(Boolean)) {
+      assert.ok(!JSON.stringify(record).includes(value));
+    }
+  }
+  await assert.rejects(encryptAutomatic({}, deviceKey), /at least one setting/);
+  await assert.rejects(encryptAutomatic({ username: " " }, deviceKey), /valid university username/);
+  await assert.rejects(encryptAutomatic({ password: "" }, deviceKey), /valid university password/);
+  await assert.rejects(encryptAutomatic({ password: "x".repeat(1025) }, deviceKey), /valid university password/);
+  await assert.rejects(encryptAutomatic({ ...config, secret: "invalid-key" }, deviceKey));
+  await assert.rejects(encryptAutomatic({ period: 30, username }, deviceKey), /Invalid saved setup key/);
+});
